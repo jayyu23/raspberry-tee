@@ -26,7 +26,7 @@ void i2c_init(void) {
     printk("I2C initialized\n");
 }
 
-int i2c_write(uint8_t addr, const uint8_t *data, unsigned len) {
+int i2c_write(unsigned addr, uint8_t data[], unsigned nbytes) {
     uint32_t status;
     
     // Check if the bus is active
@@ -49,11 +49,11 @@ int i2c_write(uint8_t addr, const uint8_t *data, unsigned len) {
     dev_barrier();
     
     // Set data length
-    PUT32(I2C_DLEN, len);
+    PUT32(I2C_DLEN, nbytes);
     dev_barrier();
     
     // Fill FIFO with data
-    for (unsigned i = 0; i < len; i++) {
+    for (unsigned i = 0; i < nbytes; i++) {
         PUT32(I2C_FIFO, data[i]);
     }
     
@@ -79,10 +79,10 @@ int i2c_write(uint8_t addr, const uint8_t *data, unsigned len) {
         return -1;
     }
     
-    return len;
+    return nbytes;
 }
 
-int i2c_read(uint8_t addr, uint8_t *data, unsigned len) {
+int i2c_read(unsigned addr, uint8_t data[], unsigned nbytes) {
     uint32_t status;
     
     // Check if the bus is active
@@ -105,7 +105,7 @@ int i2c_read(uint8_t addr, uint8_t *data, unsigned len) {
     dev_barrier();
     
     // Set data length
-    PUT32(I2C_DLEN, len);
+    PUT32(I2C_DLEN, nbytes);
     dev_barrier();
     
     // Start read transfer
@@ -113,7 +113,7 @@ int i2c_read(uint8_t addr, uint8_t *data, unsigned len) {
     dev_barrier();
     
     // Read data from FIFO
-    for (unsigned i = 0; i < len; i++) {
+    for (unsigned i = 0; i < nbytes; i++) {
         // Wait for data
         while (!(GET32(I2C_S) & I2C_S_RXD)) {
             status = GET32(I2C_S);
@@ -144,9 +144,43 @@ int i2c_read(uint8_t addr, uint8_t *data, unsigned len) {
         return -1;
     }
     
-    return len;
+    return nbytes;
 }
 
+// Adding new functions required by the header
+
+void i2c_init_clk_div(unsigned clk_div) {
+    // Reset I2C
+    PUT32(I2C_C, 0);
+    dev_barrier();
+    
+    // Clear status flags
+    PUT32(I2C_S, I2C_S_CLKT | I2C_S_ERR | I2C_S_DONE);
+    dev_barrier();
+    
+    // Set clock divider to the provided value
+    PUT32(I2C_DIV, clk_div);
+    dev_barrier();
+    
+    // Enable I2C
+    PUT32(I2C_C, I2C_C_I2CEN);
+    dev_barrier();
+    
+    printk("I2C initialized with clock divider: %u\n", clk_div);
+}
+
+// Track if I2C has been initialized
+static int i2c_initialized = 0;
+
+void i2c_init_once(void) {
+    if (!i2c_initialized) {
+        i2c_init();
+        i2c_initialized = 1;
+    }
+}
+
+// Remove or uncomment in header if you want to keep this function
+#if 0
 int i2c_write_read(uint8_t addr, const uint8_t *wdata, unsigned wlen, uint8_t *rdata, unsigned rlen) {
     if (i2c_write(addr, wdata, wlen) != wlen) {
         return -1;
@@ -157,3 +191,4 @@ int i2c_write_read(uint8_t addr, const uint8_t *wdata, unsigned wlen, uint8_t *r
     
     return i2c_read(addr, rdata, rlen);
 }
+#endif
