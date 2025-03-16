@@ -2,29 +2,28 @@
 
 void i2c_init(void) {
     // Configure GPIO pins for I2C function
-    unimplemented();
 
-    // gpio_set_function(I2C_SDA, GPIO_FUNC_ALT0);
-    // gpio_set_function(I2C_SCL, GPIO_FUNC_ALT0);
+    gpio_set_function(I2C_SDA, GPIO_FUNC_ALT0);
+    gpio_set_function(I2C_SCL, GPIO_FUNC_ALT0);
     
-    // // Set up I2C with 100kHz clock
-    // // Reset I2C
-    // PUT32(I2C_C, 0);
-    // dev_barrier();
+    // Set up I2C with 100kHz clock
+    // Reset I2C
+    PUT32(I2C_C, 0);
+    dev_barrier();
     
-    // // Clear status flags
-    // PUT32(I2C_S, I2C_S_CLKT | I2C_S_ERR | I2C_S_DONE);
-    // dev_barrier();
+    // Clear status flags
+    PUT32(I2C_S, I2C_S_CLKT | I2C_S_ERR | I2C_S_DONE);
+    dev_barrier();
     
-    // // Set clock divider for 100kHz (assuming 250MHz core clock)
-    // PUT32(I2C_DIV, 2500);
-    // dev_barrier();
+    // Set clock divider for 100kHz (assuming 250MHz core clock)
+    PUT32(I2C_DIV, 2500);
+    dev_barrier();
     
-    // // Enable I2C
-    // PUT32(I2C_C, I2C_C_I2CEN);
-    // dev_barrier();
+    // Enable I2C
+    PUT32(I2C_C, I2C_C_I2CEN);
+    dev_barrier();
     
-    // printk("I2C initialized\n");
+    printk("I2C initialized\n");
 }
 
 int i2c_write(uint8_t addr, const uint8_t *data, unsigned len) {

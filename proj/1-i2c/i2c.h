@@ -8,9 +8,10 @@
 #define I2C_SCL 3
 
 // I2C Base address
+// We use the BSC1 peripheral (pg. 28)
 #define I2C_BASE 0x20804000
 
-// I2C Registers
+// I2C Registers (BSC pg. 28)
 #define I2C_C          (I2C_BASE + 0x00)  // Control
 #define I2C_S          (I2C_BASE + 0x04)  // Status
 #define I2C_DLEN       (I2C_BASE + 0x08)  // Data Length
@@ -20,7 +21,7 @@
 #define I2C_DEL        (I2C_BASE + 0x18)  // Data Delay
 #define I2C_CLKT       (I2C_BASE + 0x1C)  // Clock Stretch Timeout
 
-// I2C Control Register Bits
+// I2C Control Register Bits (BSC pg. 29)
 #define I2C_C_I2CEN    (1 << 15)  // I2C Enable
 #define I2C_C_INTR     (1 << 10)  // Interrupt on RX
 #define I2C_C_INTT     (1 << 9)   // Interrupt on TX
@@ -29,7 +30,7 @@
 #define I2C_C_CLEAR    (1 << 5)   // Clear FIFO
 #define I2C_C_READ     (1 << 0)   // Read transfer
 
-// I2C Status Register Bits
+// I2C Status Register Bits (BSC pg. 31)
 #define I2C_S_CLKT     (1 << 9)   // Clock stretch timeout
 #define I2C_S_ERR      (1 << 8)   // Error
 #define I2C_S_RXF      (1 << 7)   // RX FIFO full

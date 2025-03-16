@@ -6,8 +6,8 @@ $(error CS140E_2025_PATH_FINAL is not set)
 endif
 
 # Tests/examples to build
-PROGS := tests/1-test-i2c-init.c
-# PROGS += tests/2-test-i2c-scan.c
+# PROGS := tests/1-test-i2c-init.c
+PROGS += tests/2-test-i2c-scan.c
 # PROGS += tests/3-test-atecc608a-detect.c
 # PROGS += tests/4-test-atecc608a-random.c
 
