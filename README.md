@@ -1,9 +1,9 @@
 # Raspberry TEE
-Bare-metal implementation on Raspberry Pi (BCM2835) with ATECC608A trusted execution element to sign blockchain transactions securely
+Bare-metal implementation on Raspberry Pi (BCM2835) with ATECC608A trusted execution environment to sign blockchain transactions securely
 
 Jay Yu and Rishi Padmanabhan
 
-CS 140E, Winter 2025 Final Project
+CS 140E: Embedded Operating Systems, Winter 2025 Final Project
 
 ![Raspberry TEE](./img/image.png)
 
