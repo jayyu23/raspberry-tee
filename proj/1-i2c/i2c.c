@@ -5,6 +5,10 @@ void i2c_init(void) {
 
     gpio_set_function(I2C_SDA, GPIO_FUNC_ALT0);
     gpio_set_function(I2C_SCL, GPIO_FUNC_ALT0);
+
+    // Set pullups
+    gpio_set_pullup(I2C_SDA);
+    gpio_set_pullup(I2C_SCL);
     
     // Set up I2C with 100kHz clock
     // Reset I2C
