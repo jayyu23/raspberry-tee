@@ -1,15 +1,15 @@
-#ifndef __I2C_H__
-#define __I2C_H__
+#ifndef __RPI_I2C_H__
+#define __RPI_I2C_H__
 
 #include "rpi.h"
 
-// I2C pins - BCM numbering
-#define I2C_SDA 2
-#define I2C_SCL 3
+// I2C pins - Ports connected on the Pi
+#define I2C_SDA 11
+#define I2C_SCL 10
 
 // I2C Base address
-// We use the BSC1 peripheral (pg. 28)
-#define I2C_BASE 0x20804000
+// We use the BSC peripheral (pg. 28)
+#define I2C_BASE 0x20205000
 
 // I2C Registers (BSC pg. 28)
 #define I2C_C          (I2C_BASE + 0x00)  // Control
@@ -42,16 +42,29 @@
 #define I2C_S_DONE     (1 << 1)   // Transfer done
 #define I2C_S_TA       (1 << 0)   // Transfer active
 
-// Initialize I2C
 void i2c_init(void);
 
-// Write data to I2C device
-int i2c_write(uint8_t addr, const uint8_t *data, unsigned len);
 
-// Read data from I2C device
-int i2c_read(uint8_t addr, uint8_t *data, unsigned len);
+void i2c_init_clk_div(unsigned clk_div);
 
-// Write then read data (common I2C operation)
-int i2c_write_read(uint8_t addr, const uint8_t *wdata, unsigned wlen, uint8_t *rdata, unsigned rlen);
+// can call N times, will only initialize once (the first time)
+void i2c_init_once(void);
+
+// write <nbytes> of <datea> to i2c device address <addr>
+int i2c_write(unsigned addr, uint8_t data[], unsigned nbytes);
+// read <nbytes> of <datea> from i2c device address <addr>
+int i2c_read(unsigned addr, uint8_t data[], unsigned nbytes);
+
+// Initialize I2C
+// void i2c_init(void);
+
+// // Write data to I2C device
+// int i2c_write(uint8_t addr, const uint8_t *data, unsigned len);
+
+// // Read data from I2C device
+// int i2c_read(uint8_t addr, uint8_t *data, unsigned len);
+
+// // Write then read data (common I2C operation)
+// int i2c_write_read(uint8_t addr, const uint8_t *wdata, unsigned wlen, uint8_t *rdata, unsigned rlen);
 
 #endif
