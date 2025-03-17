@@ -1,0 +1,7 @@
+# ATECC608A API
+
+This part of the project provides a signing interface to the ATECC608A chip with `keygen`, `sign`, and `verify` functions. It uses the NIST P256 elliptic curve.
+
+Python helper scripts are used to generate, sign, and verify sample NIST P256 ECDSA keys and messages.
+
+See ATECC608A-TFLXTLS datasheet DS40002138A-page 17 for details on the ECC256R1 curve.

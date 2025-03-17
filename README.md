@@ -1,5 +1,5 @@
-# Raspberry TEE
-Bare-metal implementation on Raspberry Pi (BCM2835) with ATECC608A trusted execution environment to sign blockchain transactions securely
+# RaspberryLedger
+Bare-metal implementation on Raspberry Pi (BCM2835) with ATECC608A trusted hardware chip to sign blockchain transactions securely
 
 Jay Yu and Rishi Padmanabhan
 

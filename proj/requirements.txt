@@ -1,0 +1,2 @@
+# Requirements for Python environment to verify p256
+pycryptodome==3.22.0
