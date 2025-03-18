@@ -29,9 +29,9 @@ int atecc608a_wakeup(void) {
     // The datasheet recommends sending 0x00 at 100kHz to generate the wake pulse
     uint8_t dummy = 0x00;
     
-    // Temporarily slow down I2C clock for wake pulse
+    // Make sure we have 100kHz I2C
     uint32_t saved_div = GET32(I2C_DIV);
-    PUT32(I2C_DIV, 2500);  // Approx 100kHz assuming 250MHz core
+    PUT32(I2C_DIV, 1500);  // We have core clock at 150MHz
     
     // Send 0x00 to address 0x00 (no ACK expected, just generating wake pulse)
     i2c_write(0x00, &dummy, 1);
