@@ -1,36 +1,66 @@
 #include "atecc608a.h"
 
+
+// Check if ATECC608A is awake
+int atecc608a_is_awake(void) {
+    // Try to read from the device
+    uint8_t response[4];
+    int read_result = i2c_read(ATECC608A_ADDR, response, 4);
+    
+    // If we can read 4 bytes and the first byte is 0x04 (count),
+    // and the second byte is 0x11 (wake status), the device is awake
+    if (read_result == 4 && response[0] == 0x04 && response[1] == 0x11) {
+        return 1;  // Device is awake
+    }
+    
+    // Check for execution status (device is awake but busy)
+    if (read_result == 4 && response[0] == 0x04 && 
+        (response[1] != 0xFF && response[1] != 0x01)) {
+        return 1;  // Device is awake but may be executing a command
+    }
+    
+    // If read fails or returns unexpected values, assume device is asleep
+    return 0;
+}
+
 // Wake up the ATECC608A
-static int atecc608a_wakeup(void) {
-    // Send wake pulse (0x00 address) with regular i2c_write
-    uint8_t wake_cmd = 0x00;
-    if (i2c_write(0x00, &wake_cmd, 1) < 0) {
-        printk("ATECC wake command failed\n");
+int atecc608a_wakeup(void) {
+    // Create a wake pulse by sending a "null" address (0x00)
+    // The datasheet recommends sending 0x00 at 100kHz to generate the wake pulse
+    uint8_t dummy = 0x00;
+    
+    // Temporarily slow down I2C clock for wake pulse
+    uint32_t saved_div = GET32(I2C_DIV);
+    PUT32(I2C_DIV, 2500);  // Approx 100kHz assuming 250MHz core
+    
+    // Send 0x00 to address 0x00 (no ACK expected, just generating wake pulse)
+    i2c_write(0x00, &dummy, 1);
+    
+    // Restore original clock speed
+    PUT32(I2C_DIV, saved_div);
+    
+    // Wait tWHI (wake high delay) - at least 1500μs per datasheet
+    delay_ms(2);  // Safe value above minimum
+    
+    // Now check if device is awake by reading the wake response
+    uint8_t response[4];
+    if (i2c_read(ATECC608A_ADDR, response, 4) != 4) {
+        printk("Failed to read wake response\n");
         return -1;
     }
     
-    // ATECC608A requires a delay after wake before it's ready
-    delay_ms(2);
-    
-    // // Read wake response
-    // uint8_t response[4];
-    // if (i2c_read(ATECC608A_ADDR, response, 4) != 4) {
-    //     printk("Failed to read wake response\n");
-    //     return -1;
-    // }
-    
-    // // Check for expected response (0x04, 0x11, 0x33, 0x43)
-    // // This may vary depending on the ATECC608A configuration
-    // if (response[0] != 0x04 || response[1] != 0x11) {
-    //     printk("Unexpected wake response\n");
-    //     return -1;
-    // }
+    // Check for expected wake response (0x04, 0x11, ...)
+    if (response[0] != 0x04 || response[1] != 0x11) {
+        printk("Unexpected wake response: %02x %02x %02x %02x\n", 
+               response[0], response[1], response[2], response[3]);
+        return -1;
+    }
     
     return 0;
 }
 
 // Put ATECC608A to sleep
-static int atecc608a_sleep(void) {
+int atecc608a_sleep(void) {
     uint8_t sleep_cmd = 0x01;  // Sleep opcode
     return i2c_write(ATECC608A_ADDR, &sleep_cmd, 1);
 }

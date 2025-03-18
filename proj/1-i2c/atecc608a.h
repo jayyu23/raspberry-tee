@@ -4,7 +4,7 @@
 #include "i2c.h"
 
 // ATECC608A I2C address (7-bit)
-#define ATECC608A_ADDR 0x60
+#define ATECC608A_ADDR 0x6C
 
 // ATECC608A commands
 #define ATECC_CMD_CHECKMAC    0x28
@@ -26,6 +26,9 @@
 #define ATECC_CMD_WRITE       0x12
 
 // Initialize the ATECC608A
+int atecc608a_wakeup(void);
+int atecc608a_sleep(void);
+
 int atecc608a_init(void);
 
 // Generate a random number
