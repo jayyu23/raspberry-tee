@@ -4,8 +4,8 @@
 #include "rpi.h"
 
 // I2C pins - Ports connected on the Pi
-#define I2C_SDA 3
-#define I2C_SCL 2
+#define I2C_SDA 11
+#define I2C_SCL 10
 
 // I2C Base address
 // We use the BSC peripheral (pg. 28)
