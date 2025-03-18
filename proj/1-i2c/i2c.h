@@ -4,8 +4,8 @@
 #include "rpi.h"
 
 // I2C pins - Ports connected on the Pi
-#define I2C_SDA 11
-#define I2C_SCL 10
+#define I2C_SDA 3
+#define I2C_SCL 2
 
 // I2C Base address
 // We use the BSC peripheral (pg. 28)
@@ -54,6 +54,8 @@ void i2c_init_clk_div(unsigned clk_div);
 
 // can call N times, will only initialize once (the first time)
 void i2c_init_once(void);
+
+int i2c_write_with_addr(uint8_t dev_addr, uint8_t word_addr, uint8_t data[], unsigned nbytes);
 
 
 

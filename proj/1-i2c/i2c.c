@@ -1,5 +1,65 @@
 #include "i2c.h"
 
+// Write data to a device with a specific word address
+int i2c_write_with_addr(uint8_t dev_addr, uint8_t word_addr, uint8_t data[], unsigned nbytes) {
+    uint32_t status;
+    
+    // Check if the bus is active
+    status = GET32(I2C_S);
+    if (status & I2C_S_TA) {
+        printk("I2C bus is still active\n");
+        return -1;
+    }
+    
+    // Clear FIFO
+    PUT32(I2C_C, GET32(I2C_C) | I2C_C_CLEAR);
+    dev_barrier();
+    
+    // Clear status flags
+    PUT32(I2C_S, I2C_S_CLKT | I2C_S_ERR | I2C_S_DONE);
+    dev_barrier();
+    
+    // Set slave address
+    PUT32(I2C_A, dev_addr);
+    dev_barrier();
+    
+    // Set data length (word_addr + actual data)
+    PUT32(I2C_DLEN, nbytes + 1);
+    dev_barrier();
+    
+    // Send word address first
+    PUT32(I2C_FIFO, word_addr);
+    
+    // Then send the actual data
+    for (unsigned i = 0; i < nbytes; i++) {
+        PUT32(I2C_FIFO, data[i]);
+    }
+    
+    // Start write transfer
+    PUT32(I2C_C, GET32(I2C_C) | I2C_C_ST);
+    dev_barrier();
+    
+    // Wait for transfer to complete
+    while (1) {
+        status = GET32(I2C_S);
+        if (status & I2C_S_DONE)
+            break;
+        
+        if (status & (I2C_S_ERR | I2C_S_CLKT)) {
+            printk("I2C error during write with addr: %x\n", status);
+            return -1;
+        }
+    }
+    
+    // Check for success
+    if (status & (I2C_S_ERR | I2C_S_CLKT)) {
+        printk("I2C error after write with addr: %x\n", status);
+        return -1;
+    }
+    
+    return nbytes + 1;
+}
+
 void i2c_init(void) {
     // Configure GPIO pins for I2C function
 
@@ -25,6 +85,10 @@ void i2c_init(void) {
     
     // Enable I2C
     PUT32(I2C_C, I2C_C_I2CEN);
+    dev_barrier();
+
+    // Clock stretching
+    PUT32(I2C_CLKT, 0xFFFF);  // Maximum timeout value
     dev_barrier();
     
     printk("I2C initialized\n");

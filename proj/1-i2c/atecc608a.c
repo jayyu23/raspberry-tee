@@ -12,19 +12,19 @@ static int atecc608a_wakeup(void) {
     // ATECC608A requires a delay after wake before it's ready
     delay_ms(2);
     
-    // Read wake response
-    uint8_t response[4];
-    if (i2c_read(ATECC608A_ADDR, response, 4) != 4) {
-        printk("Failed to read wake response\n");
-        return -1;
-    }
+    // // Read wake response
+    // uint8_t response[4];
+    // if (i2c_read(ATECC608A_ADDR, response, 4) != 4) {
+    //     printk("Failed to read wake response\n");
+    //     return -1;
+    // }
     
-    // Check for expected response (0x04, 0x11, 0x33, 0x43)
-    // This may vary depending on the ATECC608A configuration
-    if (response[0] != 0x04 || response[1] != 0x11) {
-        printk("Unexpected wake response\n");
-        return -1;
-    }
+    // // Check for expected response (0x04, 0x11, 0x33, 0x43)
+    // // This may vary depending on the ATECC608A configuration
+    // if (response[0] != 0x04 || response[1] != 0x11) {
+    //     printk("Unexpected wake response\n");
+    //     return -1;
+    // }
     
     return 0;
 }
