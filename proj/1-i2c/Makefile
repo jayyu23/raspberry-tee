@@ -6,6 +6,7 @@ $(error CS140E_2025_PATH_FINAL is not set)
 endif
 
 # Tests/examples to build
+# PROGS += tests/0-hello-world.c
 # PROGS := tests/1-test-i2c-init.c
 # PROGS += tests/2-test-i2c-scan.c
 PROGS += tests/3-atecc-wake-test.c
@@ -20,6 +21,7 @@ COMMON_SRC += ./atecc608a.c
 # Include directories
 
 # Optional bootloader
+# TTYUSB = "/dev/cu.usbserial-120"
 BOOTLOADER = pi-install
 
 # Set to 1 to automatically run after build

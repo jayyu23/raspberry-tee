@@ -2,7 +2,7 @@
 #include "i2c.h"
 
 // ATECC device address
-#define ATECC_ADDR 0xC0
+#define ATECC_ADDR 0x00
 
 // ATECC commands
 #define ATECC_WAKE 0x00
@@ -76,7 +76,6 @@ int detect_device(uint8_t addr) {
     return ((status & I2C_S_DONE) && !(status & I2C_S_ERR));
 }
 
-// Improved wake function
 int atecc_wake(void) {
     printk("Attempting to wake ATECC device...\n");
     
@@ -88,56 +87,57 @@ int atecc_wake(void) {
     PUT32(I2C_C, I2C_C_I2CEN);
     dev_barrier();
     
-    // First, force SDA low for wake pulse by bit-banging
+    // Save current GPIO function settings
     gpio_func_t i2c_func = GPIO_FUNC_ALT0;
     
-    // Configure as outputs
+    // Configure SDA and SCL as outputs
     gpio_set_output(I2C_SDA);
     gpio_set_output(I2C_SCL);
     
-    // Generate wake pulse - hold SDA low for exactly 60us (timing is critical)
+    // Generate wake pulse - hold SDA low for tWLO (60us minimum)
     gpio_write(I2C_SDA, 0);  // SDA low
-    delay_us(60);            // Hold low for 60us (exact timing from datasheet)
+    gpio_write(I2C_SCL, 1);  // SCL high during wake pulse
+    delay_ms(5);            // Hold low for 70us (slightly more than required 60us)
+    gpio_write(I2C_SDA, 1);  // SDA high (release)
     
-    // Release the bus
-    gpio_write(I2C_SDA, 1);  // SDA high
-    gpio_write(I2C_SCL, 1);  // SCL high
-    delay_us(1);             // Short delay
+    // Critical: Wait for tWHI BEFORE switching back to I2C function
+    delay_ms(2);             // tWHI is 1.5ms, use 2ms to be safe
     
     // Switch back to I2C function
     gpio_set_function(I2C_SDA, i2c_func);
     gpio_set_function(I2C_SCL, i2c_func);
+    gpio_set_pullup(I2C_SDA); // Ensure pullups are enabled
+    gpio_set_pullup(I2C_SCL);
     
-    // Wait for device to wake up (must be at least 2ms)
-    delay_ms(2);  // ATECC needs ~2ms to wake up
+    // Short delay to ensure I2C is stabilized
+    delay_ms(10);
     
-    // For wake response, use address 0x03 (special wake address)
     // Clear status
     PUT32(I2C_S, I2C_S_CLKT | I2C_S_ERR | I2C_S_DONE);
     dev_barrier();
     
-    // Set device address for wake response (0x03)
-    PUT32(I2C_A, 0x03);
+    // Use ATECC address (0x00) for wake response
+    PUT32(I2C_A, 0x00);
     dev_barrier();
     
     // Set data length for read (4 bytes)
     PUT32(I2C_DLEN, 4);
     dev_barrier();
     
-    // Start a read transfer (DON'T clear FIFO before reading)
+    // Start a read transfer
     PUT32(I2C_C, I2C_C_I2CEN | I2C_C_ST | I2C_C_READ);
     dev_barrier();
     
     // Read the response with better error handling
-    uint8_t response[4];
+    uint8_t response[4] = {0, 0, 0, 0};
     int success = 0;
     
-    // Wait for data in FIFO with timeout
-    unsigned timeout = 50000;  // Increased timeout for clock stretching
-    while (!(GET32(I2C_S) & I2C_S_RXD) && timeout > 0) {
+    // Wait for transfer to complete with a generous timeout
+    unsigned timeout = 100000;  // Very long timeout for possible clock stretching
+    while (!(GET32(I2C_S) & I2C_S_DONE) && timeout > 0) {
         timeout--;
         if (GET32(I2C_S) & I2C_S_ERR) {
-            printk("I2C error detected: 0x%x\n", GET32(I2C_S));
+            printk("I2C error during wake: %x\n", GET32(I2C_S));
             break;
         }
     }
@@ -147,35 +147,34 @@ int atecc_wake(void) {
         return 0;
     }
     
-    // Read the byte
-    response[0] = GET32(I2C_FIFO) & 0xFF;
-    response[1] = GET32(I2C_FIFO) & 0xFF;
-    response[2] = GET32(I2C_FIFO) & 0xFF;
-    response[3] = GET32(I2C_FIFO) & 0xFF;
-    
-    // Wait for transfer to complete
-    timeout = 10000;
-    while (!(GET32(I2C_S) & I2C_S_DONE) && timeout > 0) {
-        timeout--;
-        for (volatile int i = 0; i < 50; i++);
-    }
-    
-    // Clear DONE bit
-    PUT32(I2C_S, I2C_S_DONE);
-    dev_barrier();
-    
-    // Check if response indicates successful wake (typically 0x04, 0x11, 0x33, 0x43)
-    if (response[0] == 0x04 && response[1] == 0x11 && 
-        response[2] == 0x33 && response[3] == 0x43) {
-        printk("ATECC device successfully woken up!\n");
+    // Check if there's data in the FIFO
+    if (GET32(I2C_S) & I2C_S_RXD) {
+        // Read all four bytes
+        for (int i = 0; i < 4; i++) {
+            response[i] = GET32(I2C_FIFO) & 0xFF;
+        }
+        
+        // Log the response
         printk("Wake response: %x %x %x %x\n", 
                response[0], response[1], response[2], response[3]);
-        success = 1;
+               
+        // Check if response indicates successful wake (typically 0x04, 0x11, 0x33, 0x43)
+        if (response[0] == 0x04 && response[1] == 0x11 && 
+            response[2] == 0x33 && response[3] == 0x43) {
+            printk("ATECC device successfully woken up!\n");
+            success = 1;
+        } else {
+            printk("Unexpected wake response\n");
+            success = 0;
+        }
     } else {
-        printk("Received unexpected wake response: %x %x %x %x\n", 
-               response[0], response[1], response[2], response[3]);
+        printk("No data received in FIFO\n");
         success = 0;
     }
+    
+    // Clear status
+    PUT32(I2C_S, I2C_S_CLKT | I2C_S_ERR | I2C_S_DONE);
+    dev_barrier();
     
     return success;
 }
@@ -191,21 +190,32 @@ void notmain(void) {
     
     delay_ms(100);
     
-    // Use better detection
-    if (detect_device(ATECC_ADDR)) {
-        printk("Device detected at address 0x%x - could be ATECC\n", ATECC_ADDR);
-    } else {
-        printk("No device detected at address 0x%x\n", ATECC_ADDR);
-        printk("This is normal if the device is asleep - trying wake sequence\n");
-    }
-    
-    // Try to wake the device regardless
-    if (atecc_wake()) {
-        printk("SUCCESS: ATECC device woken up successfully!\n");
-    } else {
-        printk("ERROR: Failed to wake ATECC device\n");
-        printk("Please check connections and verify device address\n");
+    // Try to wake the device
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        printk("\nAttempt %d to wake ATECC device...\n", attempt);
+        
+        if (atecc_wake()) {
+            printk("SUCCESS: ATECC device woken up successfully!\n");
+            
+            // Now try to detect the device at its normal address
+            if (detect_device(ATECC_ADDR)) {
+                printk("Device detected at address %x\n", ATECC_ADDR);
+            } else {
+                printk("WARNING: Device woke up but not detected at address %x\n", ATECC_ADDR);
+            }
+            
+            break;
+        } else {
+            printk("Failed to wake ATECC device on attempt %d\n", attempt);
+            
+            if (attempt < 3) {
+                printk("Waiting before next attempt...\n");
+                delay_ms(100);
+            } else {
+                printk("All wake attempts failed.\n");
+            }
+        }
     }
     
     clean_reboot();
-} 
+}

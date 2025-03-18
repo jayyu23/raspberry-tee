@@ -1,0 +1,6 @@
+couldn't open tty port </dev/cu.usbserial-DJ00S6VV>, going to sleep
+couldn't open tty port </dev/cu.usbserial-DJ00S6VV>, going to sleep
+couldn't open tty port </dev/cu.usbserial-DJ00S6VV>, going to sleep
+couldn't open tty port </dev/cu.usbserial-DJ00S6VV>, going to sleep
+couldn't open tty port </dev/cu.usbserial-DJ00S6VV>, going to sleep
+open-tty.c:open_tty_n:18:PANIC:couldn't open tty port </dev/cu.usbserial-DJ00S6VV>
