@@ -9,7 +9,7 @@
 
 // I2C Base address
 // We use the BSC peripheral (pg. 28)
-#define I2C_BASE 0x20205000
+#define I2C_BASE 0x20804000 // BSC1 - Pi can only use this.
 
 // I2C Registers (BSC pg. 28)
 #define I2C_C          (I2C_BASE + 0x00)  // Control

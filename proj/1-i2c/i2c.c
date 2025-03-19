@@ -2,7 +2,6 @@
 
 void i2c_init(void) {
     // Configure GPIO pins for I2C function
-
     gpio_set_function(I2C_SDA, GPIO_FUNC_ALT0);
     gpio_set_function(I2C_SCL, GPIO_FUNC_ALT0);
 
@@ -28,7 +27,6 @@ void i2c_init(void) {
     dev_barrier();
 
     // Clock stretching
-    PUT32(I2C_CLKT, 0xFFFF);  // Maximum timeout value
     dev_barrier();
     
     printk("I2C initialized\n");
@@ -127,11 +125,11 @@ int i2c_read(unsigned addr, uint8_t data[], unsigned nbytes) {
     
     // Read data from FIFO
     for (unsigned i = 0; i < nbytes; i++) {
-        printk("Reading data: %d\n", i);
+        // printk("Reading data: %d\n", i);
         // Wait for data
         while (!(GET32(I2C_S) & I2C_S_RXD)) {
             status = GET32(I2C_S);
-            printk("Status: %x\n", status);
+            // printk("Status: %x\n", status);
             if (status & (I2C_S_ERR | I2C_S_CLKT)) {
                 printk("I2C error during read: %x\n", status);
                 return -1;
@@ -139,7 +137,7 @@ int i2c_read(unsigned addr, uint8_t data[], unsigned nbytes) {
         }
         
         data[i] = GET32(I2C_FIFO) & 0xFF;
-        printk("Read data: %x\n", data[i]);
+        // printk("Read data: %x\n", data[i]);
     }
     
     // Wait for transfer to complete

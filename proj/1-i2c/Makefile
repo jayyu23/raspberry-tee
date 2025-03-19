@@ -14,10 +14,10 @@ PROGS += tests/1-test-arduino.c
 # PROGS += tests/4-test-atecc608a-random.c
 
 # Common source files
-# COMMON_SRC += ./i2c.c
+COMMON_SRC += ./i2c.c
 COMMON_SRC += ./atecc608a.c
 
-STAFF_OBJS += ./staff-i2c.o
+# STAFF_OBJS += ./staff-i2c.o
 
 # Include directories
 
