@@ -12,6 +12,7 @@
 #define ATECC_CMD_INFO 0x30
 #define ATECC_CMD_PUBKEY 0x23 // Define this to read the public key
 #define ATECC_CMD_GENKEY 0x40
+#define ATECC_CMD_SIGN 0x41 // For ECDSA signing
 #define MAX_BUF_LEN 32
 
 // Simple buffer for received data
@@ -26,6 +27,7 @@ const byte deviceInfoResponse[] = {0x01, 0x23, 0x45, 0x67};
 
 byte privateKey[32] = {0};
 byte publicKey[64] = {0};
+byte signature[64] = {0};
 
 // Generate using the secp256k1 curve that Bitcoin, Ethereum and other cryptocurrencies use
 const struct uECC_Curve_t * curve = uECC_secp256k1(); 
@@ -55,12 +57,12 @@ static int rng_function(uint8_t *dest, unsigned size) {
 }
 
 void printKeyPair() {
-  // Serial.println("Private key:");
-  // for (int i = 0; i < 32; i++) {
-  //   Serial.print(privateKey[i], HEX);
-  //   Serial.print(" ");
-  // }
-  // Serial.println();
+  Serial.println("Private key:");
+  for (int i = 0; i < 32; i++) {
+    Serial.print(privateKey[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
   Serial.println("Public key:");
   for (int i = 0; i < 64; i++) {
     Serial.print(publicKey[i], HEX);
@@ -68,6 +70,27 @@ void printKeyPair() {
   }
   Serial.println();
 }
+
+void printSignature() {
+  Serial.println("Signature:");
+  for (int i = 0; i < 64; i++) {
+    Serial.print(signature[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+}
+
+void signMessage(const byte *message, size_t messageLength) {
+  Serial.println("Signing message...");
+  int ret = uECC_sign(privateKey, message, messageLength, signature, curve);
+  if (ret) {
+    Serial.println("Signature generated successfully");
+  } else {
+    Serial.println("Failed to generate signature!");
+  }
+  printSignature();
+}
+
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
@@ -179,6 +202,13 @@ void interpretCommand(byte command) {
         Serial.println("Sending X coordinate");
       }
       
+      responseLen = 32;
+      break;
+
+    case ATECC_CMD_SIGN:
+      Serial.println("SIGN");
+      signMessage(rxBuffer + 2, rxLength - 2);
+      memcpy(responseBuffer, signature, 32);
       responseLen = 32;
       break;
 

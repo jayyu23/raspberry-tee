@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.sol": "solidity",
+        "4-arduino-signature": "c"
+    }
+}
