@@ -28,13 +28,19 @@ int atecc608a_wakeup(void) {
     // Create a wake pulse by sending a "null" address (0x00)
     // The datasheet recommends sending 0x00 at 100kHz to generate the wake pulse
     uint8_t dummy = 0x00;
-    
+
     // Make sure we have 100kHz I2C
     uint32_t saved_div = GET32(I2C_DIV);
     PUT32(I2C_DIV, 1500);  // We have core clock at 150MHz
     
     // Send 0x00 to address 0x00 (no ACK expected, just generating wake pulse)
-    i2c_write(0x00, &dummy, 1);
+    // i2c_write(0x00, &dummy, 1);
+    gpio_set_output(I2C_SDA);      // Set SDA as output
+    gpio_write(I2C_SDA, 0);        // Pull SDA low
+    delay_us(80);                  // Hold low for 80μs (>60μs required)
+    gpio_write(I2C_SDA, 1);        // Release SDA high
+    gpio_set_input(I2C_SDA);       // Return SDA to input mode with pull-up
+    gpio_set_pullup(I2C_SDA);
     
     // Restore original clock speed
     PUT32(I2C_DIV, saved_div);
@@ -43,17 +49,28 @@ int atecc608a_wakeup(void) {
     delay_ms(2);  // Safe value above minimum
     
     // Now check if device is awake by reading the wake response
-    uint8_t response[4];
-    if (i2c_read(ATECC608A_ADDR, response, 4) != 4) {
-        printk("Failed to read wake response\n");
+    uint8_t response[32]; // Buffer big enough for any reasonable response
+    int read_count;
+    
+    read_count = i2c_read(ATECC608A_ADDR, response, 4);
+    if (read_count < 0) {
+        printk("Device did not respond after wake pulse\n");
         return -1;
     }
     
-    // Check for expected wake response (0x04, 0x11, ...)
-    if (response[0] != 0x04 || response[1] != 0x11) {
-        printk("Unexpected wake response: %02x %02x %02x %02x\n", 
-               response[0], response[1], response[2], response[3]);
-        return -1;
+    // Print the first byte
+    printk("Wake response byte 0: %x\n", response[0]);
+    
+    // If first byte indicates more data (typically a count byte), read remaining bytes
+    if (response[0] > 1 && response[0] < 32) {
+        read_count = i2c_read(ATECC608A_ADDR, response + 1, response[0] - 1);
+        
+        // Print all bytes received
+        printk("Wake response full (%d bytes):", response[0]);
+        for (int i = 0; i < response[0]; i++) {
+            printk(" 0x%x", response[i]);
+        }
+        printk("\n");
     }
     
     return 0;
@@ -170,10 +187,9 @@ int atecc608a_init(void) {
 }
 
 int atecc608a_random(uint8_t *rand_out) {
-    // Wake up the device
-    if (atecc608a_wakeup() < 0)
-        return -1;
-    
+    // // Wake up the device
+    // if (atecc608a_wakeup() < 0)
+    //     return -1;
     // Random command parameters
     uint8_t mode = 0x00;  // Default mode
     uint8_t response[32];

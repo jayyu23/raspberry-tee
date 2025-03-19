@@ -79,8 +79,8 @@ void i2c_init(void) {
     PUT32(I2C_S, I2C_S_CLKT | I2C_S_ERR | I2C_S_DONE);
     dev_barrier();
     
-    // Set clock divider for 100kHz (assuming 250MHz core clock)
-    PUT32(I2C_DIV, 2500);
+    // Set clock divider for 100kHz (assuming 150MHz core clock)
+    PUT32(I2C_DIV, 1500);
     dev_barrier();
     
     // Enable I2C
@@ -97,14 +97,7 @@ void i2c_init(void) {
 int i2c_write(unsigned addr, uint8_t data[], unsigned nbytes) {
     uint32_t status;
     
-    // Check if the bus is active
-    status = GET32(I2C_S);
-    if (status & I2C_S_TA) {
-        printk("I2C bus is still active\n");
-        return -1;
-    }
-    
-    // Clear FIFO
+    // Clear FIFO first
     PUT32(I2C_C, GET32(I2C_C) | I2C_C_CLEAR);
     dev_barrier();
     
@@ -120,28 +113,40 @@ int i2c_write(unsigned addr, uint8_t data[], unsigned nbytes) {
     PUT32(I2C_DLEN, nbytes);
     dev_barrier();
     
-    // Fill FIFO with data
-    for (unsigned i = 0; i < nbytes; i++) {
+    // Fill FIFO with data (be careful not to overflow)
+    for (unsigned i = 0; i < nbytes && i < 16; i++) {  // 16 is FIFO size
         PUT32(I2C_FIFO, data[i]);
     }
     
-    // Start write transfer
-    PUT32(I2C_C, GET32(I2C_C) | I2C_C_ST);
+    // Start write transfer and set I2C_C_READ bit to 0 (write mode)
+    PUT32(I2C_C, (GET32(I2C_C) & ~I2C_C_READ) | I2C_C_ST | I2C_C_I2CEN);
     dev_barrier();
     
-    // Wait for transfer to complete
-    while (1) {
+    // Wait for transfer to complete or for more FIFO space
+    unsigned bytes_sent = (nbytes < 16) ? nbytes : 16;
+    
+    while (bytes_sent < nbytes || !(GET32(I2C_S) & I2C_S_DONE)) {
         status = GET32(I2C_S);
-        if (status & I2C_S_DONE)
-            break;
         
+        // Check for errors
         if (status & (I2C_S_ERR | I2C_S_CLKT)) {
             printk("I2C error during write: %x\n", status);
             return -1;
         }
+        
+        // If FIFO can accept more data and we have more to send
+        if ((status & I2C_S_TXD) && bytes_sent < nbytes) {
+            PUT32(I2C_FIFO, data[bytes_sent++]);
+        }
+    }
+    
+    // Wait for DONE flag
+    while (!(GET32(I2C_S) & I2C_S_DONE)) {
+        // Just wait
     }
     
     // Check for success
+    status = GET32(I2C_S);
     if (status & (I2C_S_ERR | I2C_S_CLKT)) {
         printk("I2C error after write: %x\n", status);
         return -1;
@@ -182,9 +187,11 @@ int i2c_read(unsigned addr, uint8_t data[], unsigned nbytes) {
     
     // Read data from FIFO
     for (unsigned i = 0; i < nbytes; i++) {
+        printk("Reading data: %d\n", i);
         // Wait for data
         while (!(GET32(I2C_S) & I2C_S_RXD)) {
             status = GET32(I2C_S);
+            printk("Status: %x\n", status);
             if (status & (I2C_S_ERR | I2C_S_CLKT)) {
                 printk("I2C error during read: %x\n", status);
                 return -1;
@@ -192,6 +199,7 @@ int i2c_read(unsigned addr, uint8_t data[], unsigned nbytes) {
         }
         
         data[i] = GET32(I2C_FIFO) & 0xFF;
+        printk("Read data: %x\n", data[i]);
     }
     
     // Wait for transfer to complete

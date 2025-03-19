@@ -4,7 +4,7 @@
 #include "i2c.h"
 
 // ATECC608A I2C address (7-bit)
-#define ATECC608A_ADDR 0x6C
+#define ATECC608A_ADDR 0x60
 
 // ATECC608A commands
 #define ATECC_CMD_CHECKMAC    0x28
