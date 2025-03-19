@@ -1,4 +1,5 @@
 #include <Wire.h>
+#include "uECC.h"
 
 // Configuration
 #define ATECC_ADDR 0x60       // Default I2C address for ATECC devices
@@ -23,29 +24,50 @@ int responseLen = 0;
 // Predefined responses for different commands
 const byte deviceInfoResponse[] = {0x01, 0x23, 0x45, 0x67};
 
-// Hardcoded key pair (just for demonstration - in a real device these would be securely generated)
-// Private key - typically never exposed directly in a real ATECC device
-const byte privateKey[] = {
-  0x73, 0x77, 0x6d, 0x20, 0xf2, 0xc6, 0xca, 0xe0,
-  0x06, 0x13, 0xc5, 0x3d, 0x0e, 0x5f, 0xb8, 0xdb,
-  0x65, 0x30, 0x58, 0x11, 0x9d, 0x8e, 0x9b, 0xd5,
-  0x18, 0x4d, 0x00, 0x93, 0xb1, 0x43, 0x2e, 0x44
-};
+byte privateKey[32] = {0};
+byte publicKey[64] = {0};
 
-// Public key - would be generated from private key in a real device
-// For P256 curve, public key is typically 64 bytes (x,y coordinates)
-const byte publicKey[] = {
-  // X coordinate
-  0x25, 0x19, 0x0f, 0x95, 0x53, 0x7d, 0xa6, 0x8b,
-  0x89, 0x91, 0x17, 0x16, 0x2f, 0x8c, 0x47, 0x95,
-  0x56, 0x38, 0x83, 0x31, 0x01, 0x8e, 0xe5, 0x4c,
-  0xa6, 0x4d, 0x05, 0x9a, 0x9d, 0xe3, 0x61, 0x2f,
-  // Y coordinate
-  0x3c, 0x09, 0x26, 0x35, 0x06, 0x7c, 0x87, 0x4b,
-  0x46, 0xf1, 0xa8, 0xab, 0x69, 0x6f, 0xd1, 0x68,
-  0x34, 0x0f, 0x5e, 0xed, 0x0e, 0xb3, 0x1a, 0x83,
-  0x2c, 0x83, 0xd9, 0x98, 0x4e, 0xc2, 0xfd, 0xab
-};
+// Generate using the secp256k1 curve that Bitcoin, Ethereum and other cryptocurrencies use
+const struct uECC_Curve_t * curve = uECC_secp256k1(); 
+
+void generateKeyPair() {
+  Serial.println("Generating secp256k1 key pair...");
+
+  unsigned long startTime = millis();
+  int ret = uECC_make_key(publicKey, privateKey, curve);
+  unsigned long endTime = millis();
+
+  if (ret) {
+    Serial.println("Key pair generated successfully");
+    Serial.print("Generation time (ms): ");
+    Serial.println(endTime - startTime);
+  } else {
+    Serial.println("Failed to generate key pair!");
+  }
+  printKeyPair();
+}
+
+static int rng_function(uint8_t *dest, unsigned size) {
+  for (unsigned i = 0; i < size; i++) {
+    dest[i] = (uint8_t)random(256);
+  }
+  return 1;
+}
+
+void printKeyPair() {
+  // Serial.println("Private key:");
+  // for (int i = 0; i < 32; i++) {
+  //   Serial.print(privateKey[i], HEX);
+  //   Serial.print(" ");
+  // }
+  // Serial.println();
+  Serial.println("Public key:");
+  for (int i = 0; i < 64; i++) {
+    Serial.print(publicKey[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+}
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
@@ -64,11 +86,14 @@ void setup() {
   pinMode(SDA_PIN, INPUT_PULLUP);
   pinMode(SCL_PIN, INPUT_PULLUP);
   
+  uECC_set_rng(rng_function);
   Serial.println("Listening on I2C address 0x60 (96 decimal)");
+  // generateKeyPair();
 }
 
 void loop() {
 }
+
 
 // Called when RPi sends data to this device
 void receiveEvent(int numBytes) {
@@ -128,6 +153,8 @@ void interpretCommand(byte command) {
         keySlot = rxBuffer[2]; // Get slot number from command
       }
       // For simulation, we just return the X coordinate of the hardcoded public key
+      Serial.println("Generating key pair...");
+      generateKeyPair();
       memcpy(responseBuffer, publicKey, 32);
       responseLen = 32;
       Serial.print("Generated key for slot ");

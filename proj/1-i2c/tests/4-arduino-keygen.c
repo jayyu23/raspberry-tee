@@ -41,7 +41,8 @@ void notmain(void) {
     uint8_t genkey_cmd[] = {0x07, 0x40, slot, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     uint8_t genkey_data[64];
-    i2c_write_cmd(genkey_cmd, sizeof(genkey_cmd), genkey_data, sizeof(genkey_data), 500);
+    // Keygen takes around 3.7 seconds
+    i2c_write_cmd(genkey_cmd, sizeof(genkey_cmd), genkey_data, sizeof(genkey_data), 5000);
 
     // i2c_write(ATECC608A_ADDR, genkey_cmd, sizeof(genkey_cmd));
     printk("GENKEY command sent to slot %d\n", slot);
@@ -52,7 +53,7 @@ void notmain(void) {
     i2c_write_cmd(pubkey_cmd_x, sizeof(pubkey_cmd_x), pubkey_x, sizeof(pubkey_x), 500);
     printk("X coordinate: ");
     for (int i = 0; i < 32; i++) {
-        printk("%x", pubkey_x[i]);
+        printk("%x ", pubkey_x[i]);
     }
     printk("\n");
 
@@ -61,7 +62,7 @@ void notmain(void) {
     i2c_write_cmd(pubkey_cmd_y, sizeof(pubkey_cmd_y), pubkey_y, sizeof(pubkey_y), 500);
     printk("Y coordinate: ");
     for (int i = 0; i < 32; i++) {
-        printk("%x", pubkey_y[i]);
+        printk("%x ", pubkey_y[i]);
     }
     printk("\n");
 
