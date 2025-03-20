@@ -28,6 +28,7 @@
 // Initialize the ATECC608A
 int atecc608a_wakeup(void);
 int atecc608a_sleep(void);
+int atecc608a_get_revision_info(void);
 
 int atecc608a_init(void);
 

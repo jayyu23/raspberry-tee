@@ -9,11 +9,11 @@ endif
 # PROGS += tests/0-hello-world.c
 # PROGS := tests/1-test-i2c-init.c
 # PROGS += tests/2-test-i2c-scan.c
-# PROGS += tests/3-atecc-wake-test.c
+PROGS += tests/3-atecc-wake-test.c
 # PROGS += tests/4-test-atecc608a-random.c
 # PROGS += tests/4-test-arduino.c
 # PROGS += tests/4-arduino-keygen.c
-PROGS += tests/4-arduino-signature.c
+# PROGS += tests/4-arduino-signature.c
 # Common source files
 COMMON_SRC += ./i2c.c
 COMMON_SRC += ./atecc608a.c
@@ -23,7 +23,7 @@ COMMON_SRC += ./atecc608a.c
 # Include directories
 
 # Optional bootloader
-TTYUSB = "/dev/cu.usbserial-1110"
+TTYUSB = "/dev/cu.usbserial-130"
 BOOTLOADER = pi-install
 
 # Set to 1 to automatically run after build

@@ -1,4 +1,5 @@
 #include "atecc608a.h"
+#include "i2c.h"
 
 
 // Check if ATECC608A is awake
@@ -27,52 +28,34 @@ int atecc608a_is_awake(void) {
 int atecc608a_wakeup(void) {
     // Create a wake pulse by sending a "null" address (0x00)
     // The datasheet recommends sending 0x00 at 100kHz to generate the wake pulse
-    uint8_t dummy = 0x00;
+    gpio_set_function(I2C_SDA, GPIO_FUNC_OUTPUT);
 
-    // Make sure we have 100kHz I2C
-    uint32_t saved_div = GET32(I2C_DIV);
-    PUT32(I2C_DIV, 1500);  // We have core clock at 150MHz
-    
-    // Send 0x00 to address 0x00 (no ACK expected, just generating wake pulse)
-    // i2c_write(0x00, &dummy, 1);
-    gpio_set_output(I2C_SDA);      // Set SDA as output
-    gpio_write(I2C_SDA, 0);        // Pull SDA low
-    delay_us(80);                  // Hold low for 80μs (>60μs required)
-    gpio_write(I2C_SDA, 1);        // Release SDA high
-    gpio_set_input(I2C_SDA);       // Return SDA to input mode with pull-up
-    gpio_set_pullup(I2C_SDA);
-    
-    // Restore original clock speed
-    PUT32(I2C_DIV, saved_div);
-    
-    // Wait tWHI (wake high delay) - at least 1500μs per datasheet
-    delay_ms(2);  // Safe value above minimum
-    
-    // Now check if device is awake by reading the wake response
-    uint8_t response[32]; // Buffer big enough for any reasonable response
-    int read_count;
-    
-    read_count = i2c_read(ATECC608A_ADDR, response, 4);
-    if (read_count < 0) {
-        printk("Device did not respond after wake pulse\n");
-        return -1;
-    }
-    
-    // Print the first byte
-    printk("Wake response byte 0: %x\n", response[0]);
-    
-    // If first byte indicates more data (typically a count byte), read remaining bytes
-    if (response[0] > 1 && response[0] < 32) {
-        read_count = i2c_read(ATECC608A_ADDR, response + 1, response[0] - 1);
-        
-        // Print all bytes received
-        printk("Wake response full (%d bytes):", response[0]);
-        for (int i = 0; i < response[0]; i++) {
-            printk(" 0x%x", response[i]);
+    gpio_write(I2C_SDA, 0);
+    delay_us(80);  // 80 us ensures meeting tWLO (min ~60us)
+
+    gpio_write(I2C_SDA, 1);
+
+    // Switch SDA back to I2C function
+    gpio_set_function(I2C_SDA, GPIO_FUNC_ALT0);
+
+    // Wait for tWHI (at least 150 us) before communication
+    delay_us(150);
+    printk("Wake pulse sent\n");
+    i2c_init();
+    // Now immediately perform I2C read from the ATECC608A
+    uint8_t buffer[4];
+    if (i2c_read(ATECC608A_ADDR, buffer, sizeof(buffer)) < 0) {
+        // printk("I2C error during read: 0xb0000151\n");
+    } else {
+        if (buffer[0] == 0x04 &&
+            buffer[1] == 0x11 &&
+            buffer[2] == 0x33 &&
+            buffer[3] == 0x43) {
+            printk("Wake successful\n");
+        } else {
+            printk("Unexpected wake response\n");
         }
-        printk("\n");
     }
-    
     return 0;
 }
 
@@ -82,10 +65,28 @@ int atecc608a_sleep(void) {
     return i2c_write(ATECC608A_ADDR, &sleep_cmd, 1);
 }
 
+static uint16_t calculate_crc16(const uint8_t *data, size_t length) {
+    uint16_t crc = 0;
+    size_t i, j;
+    
+    for (i = 0; i < length; i++) {
+        crc ^= (data[i] << 8);
+        for (j = 0; j < 8; j++) {
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x8005;
+            } else {
+                crc = crc << 1;
+            }
+        }
+    }
+    
+    return crc;
+}
+
 // Send a command to ATECC608A and get response
 static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2, 
                                  const uint8_t *data, uint8_t data_len,
-                                 uint8_t *response, uint8_t *response_len) {
+                                 uint8_t *response, uint8_t *response_len, int delay_time_ms) {
     // Packet structure:
     // [count][cmd][param1][param2L][param2H][data...][CRC16L][CRC16H]
     uint8_t packet[64];
@@ -105,9 +106,10 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
         }
     }
     
-    // CRC calculation would go here (simplified for now)
-    packet[count - 2] = 0xAA;  // Placeholder for CRC
-    packet[count - 1] = 0xBB;  // Placeholder for CRC
+    // Calculate CRC-16 over the entire packet (excluding CRC bytes)
+    uint16_t crc = calculate_crc16(packet, count - 2);
+    packet[count - 2] = crc & 0xFF;        // CRC LSB
+    packet[count - 1] = (crc >> 8) & 0xFF; // CRC MSB
     
     // Send command
     if (i2c_write(ATECC608A_ADDR, packet, count) != count) {
@@ -116,7 +118,7 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     }
     
     // Wait for processing
-    delay_ms(5);  // Adjust based on command
+    delay_ms(delay_time_ms);  // Adjust based on command
     
     // Read response
     uint8_t temp_resp[64];
@@ -151,11 +153,17 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     
     // Check status
     if (temp_resp[1] != 0x00) {
-        printk("ATECC608A command failed with status: %02x\n", temp_resp[1]);
+        printk("ATECC608A command failed with status: %x\n", temp_resp[1]);
         return -1;
     }
     
     return 0;
+}
+
+int atecc608a_get_revision_info(void) {
+    uint8_t response[4];
+    uint8_t response_len = sizeof(response);
+    return atecc608a_send_command(ATECC_CMD_INFO, 0, 0, NULL, 0, response, &response_len, 5);
 }
 
 int atecc608a_init(void) {
@@ -173,7 +181,7 @@ int atecc608a_init(void) {
     uint8_t response[4];
     uint8_t response_len = sizeof(response);
     
-    if (atecc608a_send_command(ATECC_CMD_INFO, 0, 0, &info_param, 1, response, &response_len) < 0) {
+    if (atecc608a_send_command(ATECC_CMD_INFO, 0, 0, &info_param, 1, response, &response_len, 5) < 0) {
         printk("Failed to get ATECC608A info\n");
         return -1;
     }
@@ -195,7 +203,7 @@ int atecc608a_random(uint8_t *rand_out) {
     uint8_t response[32];
     uint8_t response_len = sizeof(response);
     
-    int ret = atecc608a_send_command(ATECC_CMD_RANDOM, mode, 0, NULL, 0, response, &response_len);
+    int ret = atecc608a_send_command(ATECC_CMD_RANDOM, mode, 0, NULL, 0, response, &response_len, 50);
     
     // Put device to sleep
     atecc608a_sleep();
