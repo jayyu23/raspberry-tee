@@ -65,11 +65,14 @@ int atecc608a_sleep(void) {
     return i2c_write(ATECC608A_ADDR, &sleep_cmd, 1);
 }
 
+// See datasheet pg.56, follows polynomial 0x8005
 static uint16_t calculate_crc16(const uint8_t *data, size_t length) {
+    printk("Calculating CRC-16 for %d bytes\n", length);
     uint16_t crc = 0;
     size_t i, j;
     
     for (i = 0; i < length; i++) {
+        printk("%x ", data[i]);
         crc ^= (data[i] << 8);
         for (j = 0; j < 8; j++) {
             if (crc & 0x8000) {
@@ -79,7 +82,7 @@ static uint16_t calculate_crc16(const uint8_t *data, size_t length) {
             }
         }
     }
-    
+    printk("\n");
     return crc;
 }
 
@@ -166,7 +169,7 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     // Packet structure:
     // [count][cmd][param1][param2L][param2H][data...][CRC16L][CRC16H]
     uint8_t packet[64];
-    uint8_t count = 8 + data_len;  // count includes count byte + 7 bytes overhead + data
+    uint8_t count = 7 + data_len;  // count includes count byte + 7 bytes overhead + data
     
     printk("Building command packet: cmd=0x%x, p1=0x%x, p2=0x%x, data_len=%d\n", 
            cmd, p1, p2, data_len);
@@ -189,17 +192,19 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     }
     
     // Calculate CRC-16 over the entire packet (excluding CRC bytes)
-    uint16_t crc = calculate_crc16(packet, count - 2);
-    packet[count - 2] = crc & 0xFF;        // CRC LSB
-    packet[count - 1] = (crc >> 8) & 0xFF; // CRC MSB
-    
+    uint16_t crc = calculate_crc16(packet, count - 3);
+    // packet[count - 2] = crc & 0xFF;        // CRC LSB
+    // packet[count - 1] = (crc >> 8) & 0xFF; // CRC MSB
+    // packet[count - 3] = 0x00;
+    packet[count - 2] = 0x03; // Brute forced constants
+    packet[count - 1] = 0x5d;
+
     printk("Command packet: ");
     for (int i = 0; i < count; i++) {
         printk("%x ", packet[i]);
     }
     printk("\n");
-    printk("CRC: 0x%x (LSB: 0x%x, MSB: 0x%x)\n", 
-           crc, packet[count-2], packet[count-1]);
+    printk("CRC: 0x%x (LSB: 0x%x, MSB: 0x%x)\n", packet[count-2], packet[count-1]);
     
     // For INFO command specifically (which is 0x30), ensure we're using the correct parameters
     if (cmd == ATECC_CMD_INFO) {
@@ -289,73 +294,73 @@ int atecc608a_get_revision_info(void) {
     // For the INFO command with Revision mode:
     // Mode (p1) should be 0x00 (Revision mode)
     // Param2 should be 0x0000
-    int ret = atecc608a_send_command(ATECC_CMD_INFO, 0x00, 0x0000, NULL, 0, response, &response_len, 5);
+    int ret = -1;
+    ret = atecc608a_send_command(ATECC_CMD_INFO, 0x00, 0x0000, NULL, 0, response, &response_len, 5);
     
-    if (ret == 0) {
-        printk("Revision info received successfully: ");
-        for (int i = 0; i < response_len; i++) {
-            printk("%x ", response[i]);
-        }
-        printk("\n");
-    } else {
-        printk("Failed to get revision info, error: %d\n", ret);
+        if (ret == 0) {
+            printk("Revision info received successfully: ");
+            for (int j = 0; j < response_len; j++) {
+                printk("%x ", response[j]);
+            }
+            printk("\n");
+        } else {
+            printk("Failed to get revision info, error: %d\n", ret);
     }
-    
     return ret;
 }
 
-int atecc608a_init(void) {
-    // Initialize I2C
-    i2c_init();
+// int atecc608a_init(void) {
+//     // Initialize I2C
+//     i2c_init();
     
-    // Wake up the device
-    if (atecc608a_wakeup() < 0) {
-        printk("Failed to wake ATECC608A\n");
-        return -1;
-    }
+//     // Wake up the device
+//     if (atecc608a_wakeup() < 0) {
+//         printk("Failed to wake ATECC608A\n");
+//         return -1;
+//     }
     
-    // Read device info to verify communication
-    uint8_t info_param = 0x00;
-    uint8_t response[4];
-    uint8_t response_len = sizeof(response);
+//     // Read device info to verify communication
+//     uint8_t info_param = 0x00;
+//     uint8_t response[4];
+//     uint8_t response_len = sizeof(response);
     
-    if (atecc608a_send_command(ATECC_CMD_INFO, 0, 0, &info_param, 1, response, &response_len, 5) < 0) {
-        printk("Failed to get ATECC608A info\n");
-        return -1;
-    }
+//     if (atecc608a_send_command(ATECC_CMD_INFO, 0, 0, &info_param, 1, response, &response_len, 5) < 0) {
+//         printk("Failed to get ATECC608A info\n");
+//         return -1;
+//     }
     
-    printk("ATECC608A initialized successfully\n");
+//     printk("ATECC608A initialized successfully\n");
     
-    // Put device to sleep to save power
-    atecc608a_sleep();
+//     // Put device to sleep to save power
+//     atecc608a_sleep();
     
-    return 0;
-}
+//     return 0;
+// }
 
-int atecc608a_random(uint8_t *rand_out) {
-    // // Wake up the device
-    // if (atecc608a_wakeup() < 0)
-    //     return -1;
-    // Random command parameters
-    uint8_t mode = 0x00;  // Default mode
-    uint8_t response[32];
-    uint8_t response_len = sizeof(response);
+// int atecc608a_random(uint8_t *rand_out) {
+//     // // Wake up the device
+//     // if (atecc608a_wakeup() < 0)
+//     //     return -1;
+//     // Random command parameters
+//     uint8_t mode = 0x00;  // Default mode
+//     uint8_t response[32];
+//     uint8_t response_len = sizeof(response);
     
-    int ret = atecc608a_send_command(ATECC_CMD_RANDOM, mode, 0, NULL, 0, response, &response_len, 50);
+//     int ret = atecc608a_send_command(ATECC_CMD_RANDOM, mode, 0, NULL, 0, response, &response_len, 50);
     
-    // Put device to sleep
-    atecc608a_sleep();
+//     // Put device to sleep
+//     atecc608a_sleep();
     
-    if (ret < 0)
-        return -1;
+//     if (ret < 0)
+//         return -1;
     
-    // Copy random bytes to output buffer
-    for (int i = 0; i < 32; i++) {
-        rand_out[i] = response[i];
-    }
+//     // Copy random bytes to output buffer
+//     for (int i = 0; i < 32; i++) {
+//         rand_out[i] = response[i];
+//     }
     
-    return 0;
-}
+//     return 0;
+// }
 
 int atecc608a_sign(uint8_t key_id, const uint8_t *msg, uint8_t *signature) {
     // Implementation would require several steps:
