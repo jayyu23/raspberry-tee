@@ -9,7 +9,8 @@ endif
 # PROGS += tests/0-hello-world.c
 # PROGS := tests/1-test-i2c-init.c
 # PROGS += tests/2-test-i2c-scan.c
-PROGS += tests/3-atecc-wake-test.c
+# PROGS += tests/3-atecc-wake-test.c
+PROGS += tests/3-atecc-random-test.c
 # PROGS += tests/4-test-atecc608a-random.c
 # PROGS += tests/4-test-arduino.c
 # PROGS += tests/4-arduino-keygen.c

@@ -263,30 +263,27 @@ int atecc608a_get_revision_info(void) {
 //     return 0;
 // }
 
-// int atecc608a_random(uint8_t *rand_out) {
-//     // // Wake up the device
-//     // if (atecc608a_wakeup() < 0)
-//     //     return -1;
-//     // Random command parameters
-//     uint8_t mode = 0x00;  // Default mode
-//     uint8_t response[32];
-//     uint8_t response_len = sizeof(response);
+int atecc608a_random(uint8_t *rand_out) {
     
-//     int ret = atecc608a_send_command(ATECC_CMD_RANDOM, mode, 0, NULL, 0, response, &response_len, 50);
+    // Wake up the device
+    atecc608a_wakeup();
+    // Random command parameters
+    uint8_t mode = 0x00;  // Default mode
+    uint8_t response[32];
+    uint8_t response_len = sizeof(response);
     
-//     // Put device to sleep
-//     atecc608a_sleep();
+    int ret = atecc608a_send_command(ATECC_CMD_RANDOM, mode, 0, NULL, 0, response, &response_len, 50);
     
-//     if (ret < 0)
-//         return -1;
+    if (ret < 0)
+        return -1;
     
-//     // Copy random bytes to output buffer
-//     for (int i = 0; i < 32; i++) {
-//         rand_out[i] = response[i];
-//     }
+    // Copy random bytes to output buffer
+    for (int i = 0; i < 32; i++) {
+        rand_out[i] = response[i + 1]; // Skip the first byte (status)
+    }
     
-//     return 0;
-// }
+    return 0;
+}
 
 int atecc608a_sign(uint8_t key_id, const uint8_t *msg, uint8_t *signature) {
     // Implementation would require several steps:
