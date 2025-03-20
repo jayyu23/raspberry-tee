@@ -66,102 +66,55 @@ int atecc608a_sleep(void) {
 }
 
 // See datasheet pg.56, follows polynomial 0x8005
-static uint16_t calculate_crc16(const uint8_t *data, size_t length) {
-    printk("Calculating CRC-16 for %d bytes\n", length);
-    uint16_t crc = 0;
-    size_t i, j;
+// static uint16_t calculate_crc16(const uint8_t *data, size_t length) {
+//     printk("Calculating CRC-16 for %d bytes\n", length);
+//     uint16_t crc = 0;
+//     size_t i, j;
     
-    for (i = 0; i < length; i++) {
+//     for (i = 0; i < length; i++) {
+//         printk("%x ", data[i]);
+//         crc ^= (data[i] << 8);
+//         for (j = 0; j < 8; j++) {
+//             if (crc & 0x8000) {
+//                 crc = (crc << 1) ^ 0x8005;
+//             } else {
+//                 crc = crc << 1;
+//             }
+//         }
+//     }
+//     printk("\n");
+//     return crc;
+// }
+
+
+uint16_t calculate_crc16(size_t length, const uint8_t *data)
+{
+    printk("Calculating CRC-16 for %d bytes\n", length);
+    printk("Data: ");
+    for (int i = 0; i < length; i++) {
         printk("%x ", data[i]);
-        crc ^= (data[i] << 8);
-        for (j = 0; j < 8; j++) {
-            if (crc & 0x8000) {
-                crc = (crc << 1) ^ 0x8005;
-            } else {
-                crc = crc << 1;
-            }
-        }
     }
     printk("\n");
-    return crc;
-}
+    size_t counter;
+    uint16_t crc_register = 0;
+    uint16_t polynom = 0x8005;
+    uint8_t shift_register;
+    uint8_t data_bit, crc_bit;
 
-// Send a command to ATECC608A and get response
-// static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2, 
-//                                  const uint8_t *data, uint8_t data_len,
-//                                  uint8_t *response, uint8_t *response_len, int delay_time_ms) {
-//     // Packet structure:
-//     // [count][cmd][param1][param2L][param2H][data...][CRC16L][CRC16H]
-//     uint8_t packet[64];
-//     uint8_t count = 8 + data_len;  // count includes count byte + 7 bytes overhead + data
-    
-//     // Build packet
-//     packet[0] = count;
-//     packet[1] = cmd;
-//     packet[2] = p1;
-//     packet[3] = p2 & 0xFF;
-//     packet[4] = (p2 >> 8) & 0xFF;
-    
-//     // Copy data if present
-//     if (data && data_len > 0) {
-//         for (int i = 0; i < data_len; i++) {
-//             packet[5 + i] = data[i];
-//         }
-//     }
-    
-//     // Calculate CRC-16 over the entire packet (excluding CRC bytes)
-//     uint16_t crc = calculate_crc16(packet, count - 2);
-//     packet[count - 2] = crc & 0xFF;        // CRC LSB
-//     packet[count - 1] = (crc >> 8) & 0xFF; // CRC MSB
-    
-//     // Send command
-//     if (i2c_write(ATECC608A_ADDR, packet, count) != count) {
-//         printk("Failed to send command to ATECC608A\n");
-//         return -1;
-//     }
-    
-//     // Wait for processing
-//     delay_ms(delay_time_ms);  // Adjust based on command
-    
-//     // Read response
-//     uint8_t temp_resp[64];
-//     int resp_len = i2c_read(ATECC608A_ADDR, temp_resp, 1);
-//     if (resp_len != 1) {
-//         printk("Failed to read response length\n");
-//         return -1;
-//     }
-    
-//     // Read the rest of the response
-//     resp_len = temp_resp[0];
-//     if (resp_len > 1) {
-//         if (i2c_read(ATECC608A_ADDR, temp_resp + 1, resp_len - 1) != resp_len - 1) {
-//             printk("Failed to read complete response\n");
-//             return -1;
-//         }
-//     }
-    
-//     // Copy response if buffer provided
-//     if (response && response_len) {
-//         // Skip count byte and status byte
-//         int copy_len = resp_len - 3;  // -3 for count, status, and CRC
-//         if (copy_len > *response_len)
-//             copy_len = *response_len;
-        
-//         for (int i = 0; i < copy_len; i++) {
-//             response[i] = temp_resp[i + 2];  // Skip count and status
-//         }
-        
-//         *response_len = copy_len;
-//     }
-    
-//     // Check status
-//     if (temp_resp[1] != 0x00) {
-//         printk("ATECC608A command failed with status: %x\n", temp_resp[1]);
-//         return -1;
-//     }
-    
-//     return 0;
-// }
+    for (counter = 0; counter < length; counter++)
+    {
+        for (shift_register = 0x01; shift_register > 0x00; shift_register <<= 1)
+        {
+            data_bit = (data[counter] & shift_register) ? 1 : 0;
+            crc_bit = crc_register >> 15;
+            crc_register <<= 1;
+            if (data_bit != crc_bit)
+                crc_register ^= polynom;
+        }
+    }
+    printk("CRC-16: 0x%x\n", crc_register);
+    return crc_register;
+}
 
 static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2, 
                                  const uint8_t *data, uint8_t data_len,
@@ -192,12 +145,14 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     }
     
     // Calculate CRC-16 over the entire packet (excluding CRC bytes)
-    uint16_t crc = calculate_crc16(packet, count - 3);
+    uint16_t crc = calculate_crc16(count - 2, packet);
     // packet[count - 2] = crc & 0xFF;        // CRC LSB
     // packet[count - 1] = (crc >> 8) & 0xFF; // CRC MSB
     // packet[count - 3] = 0x00;
-    packet[count - 2] = 0x03; // Brute forced constants
-    packet[count - 1] = 0x5d;
+    // packet[count - 2] = 0x03; // Brute forced constants
+    // packet[count - 1] = 0x5d;
+    packet[count - 2] = crc & 0xFF;        // CRC LSB
+    packet[count - 1] = (crc >> 8) & 0xFF; // CRC MSB
 
     printk("Command packet: ");
     for (int i = 0; i < count; i++) {

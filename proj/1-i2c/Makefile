@@ -23,7 +23,7 @@ COMMON_SRC += ./atecc608a.c
 # Include directories
 
 # Optional bootloader
-TTYUSB = "/dev/cu.usbserial-130"
+# TTYUSB = "/dev/cu.usbserial-130"
 BOOTLOADER = pi-install
 
 # Set to 1 to automatically run after build
