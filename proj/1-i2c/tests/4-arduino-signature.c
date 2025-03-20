@@ -17,7 +17,6 @@ void notmain(void) {
     printk("ATECC608A Detection Test for %x\n", ATECC608A_ADDR);
     
     i2c_init();
-    // PUT32(I2C_BASE + 0x1C, 0xFFFF);  // Maximum timeout value
     dev_barrier();
     printk("I2C initialized\n");
 

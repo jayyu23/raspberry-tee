@@ -66,27 +66,6 @@ int atecc608a_sleep(void) {
 }
 
 // See datasheet pg.56, follows polynomial 0x8005
-// static uint16_t calculate_crc16(const uint8_t *data, size_t length) {
-//     printk("Calculating CRC-16 for %d bytes\n", length);
-//     uint16_t crc = 0;
-//     size_t i, j;
-    
-//     for (i = 0; i < length; i++) {
-//         printk("%x ", data[i]);
-//         crc ^= (data[i] << 8);
-//         for (j = 0; j < 8; j++) {
-//             if (crc & 0x8000) {
-//                 crc = (crc << 1) ^ 0x8005;
-//             } else {
-//                 crc = crc << 1;
-//             }
-//         }
-//     }
-//     printk("\n");
-//     return crc;
-// }
-
-
 uint16_t calculate_crc16(size_t length, const uint8_t *data)
 {
     printk("Calculating CRC-16 for %d bytes\n", length);
@@ -112,71 +91,58 @@ uint16_t calculate_crc16(size_t length, const uint8_t *data)
                 crc_register ^= polynom;
         }
     }
-    printk("CRC-16: 0x%x\n", crc_register);
+    printk("CRC-16: %x\n", crc_register);
     return crc_register;
+}
+
+static void print_packet(uint8_t *packet, uint8_t count) {
+    printk("Command packet: ");
+    for (int i = 0; i < count; i++) {
+        printk("%x ", packet[i]);
+    }
+    printk("\n");
 }
 
 static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2, 
                                  const uint8_t *data, uint8_t data_len,
                                  uint8_t *response, uint8_t *response_len, int delay_time_ms) {
     // Packet structure:
-    // [count][cmd][param1][param2L][param2H][data...][CRC16L][CRC16H]
-    uint8_t packet[64];
+    // [word_addr] [count][cmd][param1][param2L][param2H][data...][CRC16L][CRC16H]
+    uint8_t packet[128];
     uint8_t count = 7 + data_len;  // count includes count byte + 7 bytes overhead + data
     
     printk("Building command packet: cmd=0x%x, p1=0x%x, p2=0x%x, data_len=%d\n", 
            cmd, p1, p2, data_len);
     
     // Build packet
-    packet[0] = count;
-    packet[1] = cmd;
-    packet[2] = p1;
-    packet[3] = p2 & 0xFF;
-    packet[4] = (p2 >> 8) & 0xFF;
+    packet[0] = 0x03; // Word address
+    packet[1] = count; // Packet length
+    packet[2] = cmd; // Command
+    packet[3] = p1; // Param1
+    packet[4] = p2 & 0xFF; // Param2 LSB
+    packet[5] = (p2 >> 8) & 0xFF; // Param2 MSB
     
     // Copy data if present
     if (data && data_len > 0) {
         printk("Including data: ");
         for (int i = 0; i < data_len; i++) {
-            packet[5 + i] = data[i];
-            printk("%x ", data[i]);
+            packet[i + 6] = data[i];
         }
-        printk("\n");
     }
     
     // Calculate CRC-16 over the entire packet (excluding CRC bytes)
-    uint16_t crc = calculate_crc16(count - 2, packet);
-    // packet[count - 2] = crc & 0xFF;        // CRC LSB
-    // packet[count - 1] = (crc >> 8) & 0xFF; // CRC MSB
-    // packet[count - 3] = 0x00;
-    // packet[count - 2] = 0x03; // Brute forced constants
-    // packet[count - 1] = 0x5d;
-    packet[count - 2] = crc & 0xFF;        // CRC LSB
-    packet[count - 1] = (crc >> 8) & 0xFF; // CRC MSB
-
-    printk("Command packet: ");
-    for (int i = 0; i < count; i++) {
-        printk("%x ", packet[i]);
-    }
-    printk("\n");
-    printk("CRC: 0x%x (LSB: 0x%x, MSB: 0x%x)\n", packet[count-2], packet[count-1]);
+    uint16_t crc = calculate_crc16(count - 2, packet + 1); // Exclude word_addr and final 2 CRC bytes
+    packet[count - 1] = crc & 0xFF;        // CRC LSB (For info is 0x03)
+    packet[count] = (crc >> 8) & 0xFF; // CRC MSB (For info is 0x5d)
     
     // For INFO command specifically (which is 0x30), ensure we're using the correct parameters
     if (cmd == ATECC_CMD_INFO) {
         printk("INFO command: mode=%d, param2=%x\n", p1, p2);
     }
-    
-    // I2C write needs a word address for ATECC608A - should be 0x03 for commands
-    uint8_t i2c_packet[count + 1];
-    i2c_packet[0] = 0x03;  // Word address for commands
-    for (int i = 0; i < count; i++) {
-        i2c_packet[i + 1] = packet[i];
-    }
-    
-    printk("Sending I2C packet with word address 0x03, total length: %d\n", count + 1);
+    print_packet(packet, count + 1);
     
     // Send command
-    if (i2c_write(ATECC608A_ADDR, i2c_packet, count + 1) != count + 1) {
+    if (i2c_write(ATECC608A_ADDR, (uint8_t *) &packet, count + 1) != count + 1) {
         printk("Failed to send command to ATECC608A\n");
         return -1;
     }
@@ -243,23 +209,28 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
 int atecc608a_get_revision_info(void) {
     printk("Executing get_revision_info...\n");
     
-    uint8_t response[7];
-    uint8_t response_len = sizeof(response);
+    uint8_t response[7]; // 4 bytes for response + 3 bytes metadata
+    uint8_t response_len = 7;
     
     // For the INFO command with Revision mode:
     // Mode (p1) should be 0x00 (Revision mode)
     // Param2 should be 0x0000
     int ret = -1;
     ret = atecc608a_send_command(ATECC_CMD_INFO, 0x00, 0x0000, NULL, 0, response, &response_len, 5);
-    
-        if (ret == 0) {
+    int data_len = response_len - 3; // 3 bytes metadata - 1 byte status + 2 bytes CRC
+    if (ret == 0) {
+        // Check if response status bit is 0x0
+        if (response[1] == 0x00) {
             printk("Revision info received successfully: ");
-            for (int j = 0; j < response_len; j++) {
-                printk("%x ", response[j]);
-            }
-            printk("\n");
         } else {
-            printk("Failed to get revision info, error: %d\n", ret);
+            printk("Failed to get revision info: ");
+        }
+        for (int j = 0; j < data_len; j++) {
+            printk("%x ", response[j + 1]);
+        }
+        printk("\n");
+    } else {
+        printk("Failed to get revision info, error: %d\n", ret);
     }
     return ret;
 }
