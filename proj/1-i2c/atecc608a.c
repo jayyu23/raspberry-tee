@@ -209,14 +209,15 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
 int atecc608a_get_revision_info(void) {
     printk("Executing get_revision_info...\n");
     
-    uint8_t response[7];
-    uint8_t response_len = sizeof(response);
+    uint8_t response[7]; // 4 bytes for response + 3 bytes metadata
+    uint8_t response_len = 7;
     
     // For the INFO command with Revision mode:
     // Mode (p1) should be 0x00 (Revision mode)
     // Param2 should be 0x0000
     int ret = -1;
     ret = atecc608a_send_command(ATECC_CMD_INFO, 0x00, 0x0000, NULL, 0, response, &response_len, 5);
+    int data_len = response_len - 3; // 3 bytes metadata - 1 byte status + 2 bytes CRC
     if (ret == 0) {
         // Check if response status bit is 0x0
         if (response[1] == 0x00) {
@@ -224,8 +225,8 @@ int atecc608a_get_revision_info(void) {
         } else {
             printk("Failed to get revision info: ");
         }
-        for (int j = 0; j < response_len; j++) {
-            printk("%x ", response[j]);
+        for (int j = 0; j < data_len; j++) {
+            printk("%x ", response[j + 1]);
         }
         printk("\n");
     } else {
