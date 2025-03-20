@@ -84,6 +84,82 @@ static uint16_t calculate_crc16(const uint8_t *data, size_t length) {
 }
 
 // Send a command to ATECC608A and get response
+// static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2, 
+//                                  const uint8_t *data, uint8_t data_len,
+//                                  uint8_t *response, uint8_t *response_len, int delay_time_ms) {
+//     // Packet structure:
+//     // [count][cmd][param1][param2L][param2H][data...][CRC16L][CRC16H]
+//     uint8_t packet[64];
+//     uint8_t count = 8 + data_len;  // count includes count byte + 7 bytes overhead + data
+    
+//     // Build packet
+//     packet[0] = count;
+//     packet[1] = cmd;
+//     packet[2] = p1;
+//     packet[3] = p2 & 0xFF;
+//     packet[4] = (p2 >> 8) & 0xFF;
+    
+//     // Copy data if present
+//     if (data && data_len > 0) {
+//         for (int i = 0; i < data_len; i++) {
+//             packet[5 + i] = data[i];
+//         }
+//     }
+    
+//     // Calculate CRC-16 over the entire packet (excluding CRC bytes)
+//     uint16_t crc = calculate_crc16(packet, count - 2);
+//     packet[count - 2] = crc & 0xFF;        // CRC LSB
+//     packet[count - 1] = (crc >> 8) & 0xFF; // CRC MSB
+    
+//     // Send command
+//     if (i2c_write(ATECC608A_ADDR, packet, count) != count) {
+//         printk("Failed to send command to ATECC608A\n");
+//         return -1;
+//     }
+    
+//     // Wait for processing
+//     delay_ms(delay_time_ms);  // Adjust based on command
+    
+//     // Read response
+//     uint8_t temp_resp[64];
+//     int resp_len = i2c_read(ATECC608A_ADDR, temp_resp, 1);
+//     if (resp_len != 1) {
+//         printk("Failed to read response length\n");
+//         return -1;
+//     }
+    
+//     // Read the rest of the response
+//     resp_len = temp_resp[0];
+//     if (resp_len > 1) {
+//         if (i2c_read(ATECC608A_ADDR, temp_resp + 1, resp_len - 1) != resp_len - 1) {
+//             printk("Failed to read complete response\n");
+//             return -1;
+//         }
+//     }
+    
+//     // Copy response if buffer provided
+//     if (response && response_len) {
+//         // Skip count byte and status byte
+//         int copy_len = resp_len - 3;  // -3 for count, status, and CRC
+//         if (copy_len > *response_len)
+//             copy_len = *response_len;
+        
+//         for (int i = 0; i < copy_len; i++) {
+//             response[i] = temp_resp[i + 2];  // Skip count and status
+//         }
+        
+//         *response_len = copy_len;
+//     }
+    
+//     // Check status
+//     if (temp_resp[1] != 0x00) {
+//         printk("ATECC608A command failed with status: %x\n", temp_resp[1]);
+//         return -1;
+//     }
+    
+//     return 0;
+// }
+
 static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2, 
                                  const uint8_t *data, uint8_t data_len,
                                  uint8_t *response, uint8_t *response_len, int delay_time_ms) {
@@ -91,6 +167,9 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     // [count][cmd][param1][param2L][param2H][data...][CRC16L][CRC16H]
     uint8_t packet[64];
     uint8_t count = 8 + data_len;  // count includes count byte + 7 bytes overhead + data
+    
+    printk("Building command packet: cmd=0x%x, p1=0x%x, p2=0x%x, data_len=%d\n", 
+           cmd, p1, p2, data_len);
     
     // Build packet
     packet[0] = count;
@@ -101,9 +180,12 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     
     // Copy data if present
     if (data && data_len > 0) {
+        printk("Including data: ");
         for (int i = 0; i < data_len; i++) {
             packet[5 + i] = data[i];
+            printk("%x ", data[i]);
         }
+        printk("\n");
     }
     
     // Calculate CRC-16 over the entire packet (excluding CRC bytes)
@@ -111,59 +193,115 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     packet[count - 2] = crc & 0xFF;        // CRC LSB
     packet[count - 1] = (crc >> 8) & 0xFF; // CRC MSB
     
+    printk("Command packet: ");
+    for (int i = 0; i < count; i++) {
+        printk("%x ", packet[i]);
+    }
+    printk("\n");
+    printk("CRC: 0x%x (LSB: 0x%x, MSB: 0x%x)\n", 
+           crc, packet[count-2], packet[count-1]);
+    
+    // For INFO command specifically (which is 0x30), ensure we're using the correct parameters
+    if (cmd == ATECC_CMD_INFO) {
+        printk("INFO command: mode=%d, param2=%x\n", p1, p2);
+    }
+    
+    // I2C write needs a word address for ATECC608A - should be 0x03 for commands
+    uint8_t i2c_packet[count + 1];
+    i2c_packet[0] = 0x03;  // Word address for commands
+    for (int i = 0; i < count; i++) {
+        i2c_packet[i + 1] = packet[i];
+    }
+    
+    printk("Sending I2C packet with word address 0x03, total length: %d\n", count + 1);
+    
     // Send command
-    if (i2c_write(ATECC608A_ADDR, packet, count) != count) {
+    if (i2c_write(ATECC608A_ADDR, i2c_packet, count + 1) != count + 1) {
         printk("Failed to send command to ATECC608A\n");
         return -1;
     }
     
     // Wait for processing
-    delay_ms(delay_time_ms);  // Adjust based on command
-    
-    // Read response
-    uint8_t temp_resp[64];
-    int resp_len = i2c_read(ATECC608A_ADDR, temp_resp, 1);
-    if (resp_len != 1) {
-        printk("Failed to read response length\n");
-        return -1;
-    }
-    
-    // Read the rest of the response
-    resp_len = temp_resp[0];
-    if (resp_len > 1) {
-        if (i2c_read(ATECC608A_ADDR, temp_resp + 1, resp_len - 1) != resp_len - 1) {
-            printk("Failed to read complete response\n");
-            return -1;
-        }
-    }
-    
-    // Copy response if buffer provided
-    if (response && response_len) {
-        // Skip count byte and status byte
-        int copy_len = resp_len - 3;  // -3 for count, status, and CRC
-        if (copy_len > *response_len)
-            copy_len = *response_len;
+    printk("Waiting %d ms for command execution...\n", delay_time_ms);
+    delay_ms(delay_time_ms);
+
+    // Try polling for command completion
+    printk("Polling for command completion...\n");
+    int tries = 0;
+    int max_tries = 10;
+    while (tries < max_tries) {
+        // Reset word address (optional, may help with some I2C implementations)
+        uint8_t reset_addr = 0x00;
+        i2c_write(ATECC608A_ADDR, &reset_addr, 1);
+        delay_ms(1);
         
-        for (int i = 0; i < copy_len; i++) {
-            response[i] = temp_resp[i + 2];  // Skip count and status
+        // Read response length
+        uint8_t temp_resp[64];
+        int resp_len = i2c_read(ATECC608A_ADDR, temp_resp, 1);
+        
+        if (resp_len != 1) {
+            printk("Polling: No response yet (try %d/%d)\n", tries+1, max_tries);
+            tries++;
+            delay_ms(5);  // Wait a bit longer
+            continue;
         }
         
-        *response_len = copy_len;
+        // Got a response
+        resp_len = temp_resp[0];
+        printk("Response length: %d bytes\n", resp_len);
+        
+        // Read the rest
+        if (resp_len > 1) {
+            int read_bytes = i2c_read(ATECC608A_ADDR, temp_resp + 1, resp_len - 1);
+            if (read_bytes != resp_len - 1) {
+                printk("Failed to read complete response\n");
+                tries++;
+                delay_ms(5);
+                continue;
+            }
+            
+            // Print response
+            printk("Full response on poll %d: ", tries+1);
+            for (int i = 0; i < resp_len; i++) {
+                printk("%x ", temp_resp[i]);
+            }
+            printk("\n");
+            // Copy to response buffer
+            for (int i = 0; i < resp_len; i++) {
+                response[i] = temp_resp[i];
+            }
+            *response_len = resp_len;
+            return 0;  // Success
+        }
+        
+        tries++;
+        delay_ms(5);
     }
-    
-    // Check status
-    if (temp_resp[1] != 0x00) {
-        printk("ATECC608A command failed with status: %x\n", temp_resp[1]);
-        return -1;
-    }
-    
-    return 0;
+    return -1;  // Failure if max tries exceeded
 }
 
 int atecc608a_get_revision_info(void) {
+    printk("Executing get_revision_info...\n");
+    
     uint8_t response[4];
     uint8_t response_len = sizeof(response);
-    return atecc608a_send_command(ATECC_CMD_INFO, 0, 0, NULL, 0, response, &response_len, 5);
+    
+    // For the INFO command with Revision mode:
+    // Mode (p1) should be 0x00 (Revision mode)
+    // Param2 should be 0x0000
+    int ret = atecc608a_send_command(ATECC_CMD_INFO, 0x00, 0x0000, NULL, 0, response, &response_len, 5);
+    
+    if (ret == 0) {
+        printk("Revision info received successfully: ");
+        for (int i = 0; i < response_len; i++) {
+            printk("%x ", response[i]);
+        }
+        printk("\n");
+    } else {
+        printk("Failed to get revision info, error: %d\n", ret);
+    }
+    
+    return ret;
 }
 
 int atecc608a_init(void) {
