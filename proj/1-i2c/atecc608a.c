@@ -68,12 +68,12 @@ int atecc608a_sleep(void) {
 // See datasheet pg.56, follows polynomial 0x8005
 uint16_t calculate_crc16(size_t length, const uint8_t *data)
 {
-    printk("Calculating CRC-16 for %d bytes\n", length);
-    printk("Data: ");
-    for (int i = 0; i < length; i++) {
-        printk("%x ", data[i]);
-    }
-    printk("\n");
+    // printk("Calculating CRC-16 for %d bytes\n", length);
+    // printk("Data: ");
+    // for (int i = 0; i < length; i++) {
+    //     printk("%x ", data[i]);
+    // }
+    // printk("\n");
     size_t counter;
     uint16_t crc_register = 0;
     uint16_t polynom = 0x8005;
@@ -111,8 +111,8 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     uint8_t packet[128];
     uint8_t count = 7 + data_len;  // count includes count byte + 7 bytes overhead + data
     
-    printk("Building command packet: cmd=0x%x, p1=0x%x, p2=0x%x, data_len=%d\n", 
-           cmd, p1, p2, data_len);
+    // printk("Building command packet: cmd=0x%x, p1=0x%x, p2=0x%x, data_len=%d\n", 
+    //        cmd, p1, p2, data_len);
     
     // Build packet
     packet[0] = 0x03; // Word address
@@ -124,7 +124,6 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     
     // Copy data if present
     if (data && data_len > 0) {
-        printk("Including data: ");
         for (int i = 0; i < data_len; i++) {
             packet[i + 6] = data[i];
         }
@@ -135,10 +134,6 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     packet[count - 1] = crc & 0xFF;        // CRC LSB (For info is 0x03)
     packet[count] = (crc >> 8) & 0xFF; // CRC MSB (For info is 0x5d)
     
-    // For INFO command specifically (which is 0x30), ensure we're using the correct parameters
-    if (cmd == ATECC_CMD_INFO) {
-        printk("INFO command: mode=%d, param2=%x\n", p1, p2);
-    }
     print_packet(packet, count + 1);
     
     // Send command
@@ -235,33 +230,15 @@ int atecc608a_get_revision_info(void) {
     return ret;
 }
 
-// int atecc608a_init(void) {
-//     // Initialize I2C
-//     i2c_init();
-    
-//     // Wake up the device
-//     if (atecc608a_wakeup() < 0) {
-//         printk("Failed to wake ATECC608A\n");
-//         return -1;
-//     }
-    
-//     // Read device info to verify communication
-//     uint8_t info_param = 0x00;
-//     uint8_t response[4];
-//     uint8_t response_len = sizeof(response);
-    
-//     if (atecc608a_send_command(ATECC_CMD_INFO, 0, 0, &info_param, 1, response, &response_len, 5) < 0) {
-//         printk("Failed to get ATECC608A info\n");
-//         return -1;
-//     }
-    
-//     printk("ATECC608A initialized successfully\n");
-    
-//     // Put device to sleep to save power
-//     atecc608a_sleep();
-    
-//     return 0;
-// }
+int atecc608a_init(void) {
+    // Initialize I2C
+    i2c_init();
+    // Wake up the device
+    atecc608a_wakeup();
+    // Get revision info
+    atecc608a_get_revision_info();
+    return 0;
+}
 
 int atecc608a_random(uint8_t *rand_out) {
     
@@ -285,14 +262,107 @@ int atecc608a_random(uint8_t *rand_out) {
     return 0;
 }
 
-int atecc608a_sign(uint8_t key_id, const uint8_t *msg, uint8_t *signature) {
-    // Implementation would require several steps:
-    // 1. Load the message digest into TempKey using NONCE command
-    // 2. Sign the digest using SIGN command
-    // For brevity, this is simplified
+// Get the public key
+int atecc608a_pubkey(uint8_t key_id, uint8_t *pubkey) {
+    // Wake up the device first
+    atecc608a_wakeup();
     
-    printk("Signing with key %d (not fully implemented)\n", key_id);
-    return -1;  // Not fully implemented in this scaffold
+    uint8_t response[70]; // Large enough for the signature response
+    uint8_t response_len = sizeof(response);
+    
+    // Send GENKEY command with mode 0 (get public key from private key)
+    // Mode 0x00: compute public key from existing private key
+    printk("Retrieving public key for key_id %d...\n", key_id);
+    
+    // The key_id is provided in param2
+    uint16_t param2 = key_id;
+    
+    int ret = atecc608a_send_command(ATECC_CMD_GENKEY, 0x00, param2, 
+                                    NULL, 0, response, &response_len, 50);
+    
+    if (ret != 0) {
+        printk("Failed to execute GENKEY command\n");
+        return -1;
+    }
+        
+    // The public key is 64 bytes (X and Y coordinates, 32 bytes each)
+    // It starts after count byte in the response
+    printk("Public key retrieved successfully\n");
+    
+    // Copy the public key to the output buffer
+    for (int i = 0; i < 64; i++) {
+        pubkey[i] = response[i + 1]; // Skip count byte
+    }
+    
+    // Put the device to sleep to save power
+    atecc608a_sleep();
+    
+    return 0;
+}
+
+
+int atecc608a_sign(uint8_t key_id, const uint8_t *msg, uint8_t *signature) {
+    // Wake up the device first
+    atecc608a_wakeup();
+    
+    uint8_t response[70]; // Large enough for the signature response
+    uint8_t response_len = sizeof(response);
+    int ret;
+    
+    // Step 1: Load the message digest into TempKey using NONCE command
+    // For NONCE command in Pass-through mode (mode 3)
+    // This loads the 32-byte message/digest directly into TempKey
+    printk("Loading message digest into TempKey...\n");
+    ret = atecc608a_send_command(ATECC_CMD_NONCE, 0x03, 0x0000, 
+                                msg, 32, response, &response_len, 10);
+    
+    if (ret != 0) {
+        printk("Failed to execute NONCE command\n");
+        return -1;
+    }
+    
+    // Check if NONCE command was successful
+    if (response[1] != 0x00) {
+        printk("NONCE command failed with error: %x\n", response[1]);
+        return -1;
+    }
+    
+    // Step 2: Sign the digest using SIGN command
+    // Mode 0x80: use TempKey as the source of the digest
+    printk("Signing digest with key %d...\n", key_id);
+    response_len = sizeof(response);
+    
+    // The key_id parameter is provided in param2
+    uint16_t param2 = key_id;
+    
+    ret = atecc608a_send_command(ATECC_CMD_SIGN, 0x80, param2, 
+                                NULL, 0, response, &response_len, 100);
+    
+    if (ret != 0) {
+        printk("Failed to execute SIGN command\n");
+        return -1;
+    }
+    
+    // Check if SIGN command was successful
+    // if (response[1] != 0x00) {
+    //     printk("SIGN command failed with error: %x\n", response[1]);
+    //     return -1;
+    // }
+    
+    // Copy the signature from the response
+    // The signature is 64 bytes (r and s components of ECDSA signature)
+    // It starts after the status byte (response[1])
+    printk("Signature generated successfully\n");
+    
+    // Copy the signature to the output buffer
+    for (int i = 0; i < 64; i++) {
+        signature[i] = response[i + 1];
+    }
+    
+    // Put the device to sleep to save power
+    atecc608a_sleep();
+    
+    return 0;
 }
 
 int atecc608a_verify(uint8_t key_id, const uint8_t *msg, const uint8_t *signature) {

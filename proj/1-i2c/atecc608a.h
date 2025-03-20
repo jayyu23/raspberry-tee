@@ -35,6 +35,9 @@ int atecc608a_init(void);
 // Generate a random number
 int atecc608a_random(uint8_t *rand_out);
 
+// Get the public key
+int atecc608a_pubkey(uint8_t key_id, uint8_t *pubkey);
+
 // Sign a message digest using a private key
 int atecc608a_sign(uint8_t key_id, const uint8_t *msg, uint8_t *signature);
 

@@ -10,11 +10,13 @@ endif
 # PROGS := tests/1-test-i2c-init.c
 # PROGS += tests/2-test-i2c-scan.c
 # PROGS += tests/3-atecc-wake-test.c
-PROGS += tests/3-atecc-random-test.c
+# PROGS += tests/3-atecc-random-test.c
 # PROGS += tests/4-test-atecc608a-random.c
 # PROGS += tests/4-test-arduino.c
 # PROGS += tests/4-arduino-keygen.c
 # PROGS += tests/4-arduino-signature.c
+PROGS += tests/5-atecc-sign.c
+
 # Common source files
 COMMON_SRC += ./i2c.c
 COMMON_SRC += ./atecc608a.c
