@@ -283,7 +283,7 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
 int atecc608a_get_revision_info(void) {
     printk("Executing get_revision_info...\n");
     
-    uint8_t response[4];
+    uint8_t response[7];
     uint8_t response_len = sizeof(response);
     
     // For the INFO command with Revision mode:

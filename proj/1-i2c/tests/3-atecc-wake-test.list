@@ -665,16 +665,16 @@ Disassembly of section .text:
 
 000089d4 <atecc608a_get_revision_info>:
     89d4:	e92d4030 	push	{r4, r5, lr}
-    89d8:	e24dd01c 	sub	sp, sp, #28, 0
+    89d8:	e24dd024 	sub	sp, sp, #36, 0	; 0x24
     89dc:	e59f0098 	ldr	r0, [pc, #152]	; 8a7c <atecc608a_get_revision_info+0xa8>
     89e0:	eb000084 	bl	8bf8 <printk>
-    89e4:	e3a03004 	mov	r3, #4, 0
-    89e8:	e5cd3013 	strb	r3, [sp, #19]
+    89e4:	e3a03007 	mov	r3, #7, 0
+    89e8:	e5cd3017 	strb	r3, [sp, #23]
     89ec:	e3a03005 	mov	r3, #5, 0
     89f0:	e58d300c 	str	r3, [sp, #12]
-    89f4:	e28d3013 	add	r3, sp, #19, 0
+    89f4:	e28d3017 	add	r3, sp, #23, 0
     89f8:	e58d3008 	str	r3, [sp, #8]
-    89fc:	e28d3014 	add	r3, sp, #20, 0
+    89fc:	e28d3018 	add	r3, sp, #24, 0
     8a00:	e58d3004 	str	r3, [sp, #4]
     8a04:	e3a01000 	mov	r1, #0, 0
     8a08:	e58d1000 	str	r1, [sp]
@@ -688,19 +688,19 @@ Disassembly of section .text:
     8a28:	eb000072 	bl	8bf8 <printk>
     8a2c:	e1a04005 	mov	r4, r5
     8a30:	ea000005 	b	8a4c <atecc608a_get_revision_info+0x78>
-    8a34:	e28d3018 	add	r3, sp, #24, 0
+    8a34:	e28d3020 	add	r3, sp, #32, 0
     8a38:	e0833004 	add	r3, r3, r4
-    8a3c:	e5531004 	ldrb	r1, [r3, #-4]
+    8a3c:	e5531008 	ldrb	r1, [r3, #-8]
     8a40:	e59f003c 	ldr	r0, [pc, #60]	; 8a84 <atecc608a_get_revision_info+0xb0>
     8a44:	eb00006b 	bl	8bf8 <printk>
     8a48:	e2844001 	add	r4, r4, #1, 0
-    8a4c:	e5dd3013 	ldrb	r3, [sp, #19]
+    8a4c:	e5dd3017 	ldrb	r3, [sp, #23]
     8a50:	e1530004 	cmp	r3, r4
     8a54:	cafffff6 	bgt	8a34 <atecc608a_get_revision_info+0x60>
     8a58:	e59f0028 	ldr	r0, [pc, #40]	; 8a88 <atecc608a_get_revision_info+0xb4>
     8a5c:	eb000065 	bl	8bf8 <printk>
     8a60:	e1a00005 	mov	r0, r5
-    8a64:	e28dd01c 	add	sp, sp, #28, 0
+    8a64:	e28dd024 	add	sp, sp, #36, 0	; 0x24
     8a68:	e8bd8030 	pop	{r4, r5, pc}
     8a6c:	e1a01005 	mov	r1, r5
     8a70:	e59f0014 	ldr	r0, [pc, #20]	; 8a8c <atecc608a_get_revision_info+0xb8>
