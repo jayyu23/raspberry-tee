@@ -24,7 +24,7 @@ void notmain(void) {
     atecc608a_pubkey(0, pubkey);
     printk("Public key: ");
     for (int i = 0; i < 64; i++) {
-        printk("%x ", pubkey[i]);
+        printk("%x, ", pubkey[i]);
     }
     printk("\n");
     
@@ -33,7 +33,7 @@ void notmain(void) {
     atecc608a_sign(0, msg, signature);
     printk("Signature: ");
     for (int i = 0; i < 64; i++) {
-        printk("%x ", signature[i]);
+        printk("%x, ", signature[i]);
     }
     printk("\n");
     clean_reboot();
