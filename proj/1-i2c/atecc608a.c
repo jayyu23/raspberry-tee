@@ -365,12 +365,167 @@ int atecc608a_sign(uint8_t key_id, const uint8_t *msg, uint8_t *signature) {
     return 0;
 }
 
-int atecc608a_verify(uint8_t key_id, const uint8_t *msg, const uint8_t *signature) {
-    // Implementation would require:
-    // 1. Load the message digest using NONCE command
-    // 2. Verify the signature using VERIFY command
-    // For brevity, this is simplified
+// First, implement the missing verify_signature function
+int atecc608a_verify_signature(const uint8_t *signature, const uint8_t *public_key) {
+    // Ensure the device is awake
+    if (!atecc608a_is_awake()) {
+        atecc608a_wakeup();
+    }
     
-    printk("Verifying with key %d (not fully implemented)\n", key_id);
-    return -1;  // Not fully implemented in this scaffold
+    uint8_t response[7]; // Count + status + CRC bytes
+    uint8_t response_len = sizeof(response);
+    
+    // Prepare the combined data buffer for the VERIFY command
+    uint8_t verify_data[128];
+    
+    // Copy signature (64 bytes) to the first part of verify_data
+    for (int i = 0; i < 64; i++) {
+        verify_data[i] = signature[i];
+    }
+    
+    // Copy public key (64 bytes) to the second part of verify_data
+    for (int i = 0; i < 64; i++) {
+        verify_data[i + 64] = public_key[i];
+    }
+    
+    printk("Verifying signature with external public key...\n");
+    
+    // Send VERIFY command in External mode (0x02)
+    // Param2 = 0x0004 specifies P256 NIST ECC curve
+    int ret = atecc608a_send_command(ATECC_CMD_VERIFY, 0x02, 0x0004, 
+                                    verify_data, sizeof(verify_data), 
+                                    response, &response_len, 70);
+    
+    if (ret != 0) {
+        printk("Failed to execute VERIFY command\n");
+        return -1;
+    }
+    
+    // Check verification result
+    if (response[1] == 0x00) {
+        printk("Signature verified successfully\n");
+        return 0; // Success
+    } else if (response[1] == 0x01) {
+        printk("Signature verification failed - invalid signature\n");
+        return 1; // Invalid signature
+    } else {
+        printk("Verification command returned error: 0x%02x\n", response[1]);
+        return -1; // Other error
+    }
+}
+int atecc608a_load_tempkey(const uint8_t *data) {
+    // Wake up the device if needed
+    if (!atecc608a_is_awake()) {
+        atecc608a_wakeup();
+    }
+    
+    uint8_t response[7]; // Count + status + 2 CRC bytes + buffer
+    uint8_t response_len = sizeof(response);
+    
+    printk("Loading data into TempKey using NONCE command...\n");
+    
+    // NONCE command with mode 0x03 (Pass-through mode)
+    // This directly loads the 32-byte input into TempKey without hashing
+    int ret = atecc608a_send_command(ATECC_CMD_NONCE, 0x03, 0x0000, 
+                                    data, 32, response, &response_len, 10);
+    
+    if (ret != 0) {
+        printk("Failed to execute NONCE command\n");
+        return -1;
+    }
+    
+    // Check if NONCE command was successful (status byte should be 0x00)
+    if (response[1] != 0x00) {
+        printk("NONCE command failed with error code: 0x%02x\n", response[1]);
+        return -1;
+    }
+    
+    printk("Data successfully loaded into TempKey\n");
+    return 0;
+}
+
+int atecc608a_verify(const uint8_t *msg, const uint8_t *signature, const uint8_t *public_key) {
+    // Step 1: Load the message digest into TempKey
+    int ret = atecc608a_load_tempkey(msg);
+    if (ret != 0) {
+        printk("Failed to load message into TempKey\n");
+        return -1;
+    }
+    
+    // Step 2: Verify the signature against the public key
+    ret = atecc608a_verify_signature(signature, public_key);
+    
+    // Put the device to sleep to save power
+    atecc608a_sleep();
+    
+    return ret;
+}
+
+// Now create a complete test function
+int test_sign_verify(void) {
+    printk("Starting sign-verify test...\n");
+    
+    // Initialize the device
+    atecc608a_init();
+    
+    // Test message (this could be a hash of your actual data)
+    uint8_t message[32] = {
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+        0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+        0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+        0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20
+    };
+    
+    // Buffers for signature and public key
+    uint8_t signature[64] = {0};
+    uint8_t public_key[64] = {0};
+    
+    // Slot ID to use for signing - choose a slot configured with a private ECC key
+    uint8_t key_id = 0; // Adjust this to match your configuration
+    
+    // Step 1: Get the public key for the slot
+    printk("Retrieving public key from slot %d...\n", key_id);
+    if (atecc608a_pubkey(key_id, public_key) != 0) {
+        printk("Failed to retrieve public key\n");
+        return -1;
+    }
+    
+    // Print the public key (hex format for better readability)
+    printk("Public key: ");
+    for (int i = 0; i < 64; i++) {
+        printk("%x", public_key[i]);
+        if ((i + 1) % 16 == 0) printk("\n           ");
+    }
+    printk("\n");
+    
+    // Step 2: Sign the message with the private key
+    printk("Signing message with private key in slot %d...\n", key_id);
+    if (atecc608a_sign(key_id, message, signature) != 0) {
+        printk("Failed to sign message\n");
+        return -1;
+    }
+    
+    // Print the signature (hex format)
+    printk("Signature: ");
+    for (int i = 0; i < 64; i++) {
+        printk("%x", signature[i]);
+        if ((i + 1) % 16 == 0) printk("\n           ");
+    }
+    printk("\n");
+    
+    // Step 3: Verify the signature using the public key
+    printk("Verifying signature...\n");
+    message[3] = 0x09;
+    int result = atecc608a_verify(message, signature, public_key);
+    
+    if (result == 0) {
+        printk("VERIFICATION SUCCESSFUL: Signature is valid!\n");
+        return 0;
+    } else if (result == 1) {
+        printk("VERIFICATION FAILED: Signature is invalid\n");
+        return 1;
+    } else {
+        printk("VERIFICATION ERROR: Process failed\n");
+        return -1;
+    }
 }
