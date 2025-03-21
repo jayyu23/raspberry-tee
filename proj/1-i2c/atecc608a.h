@@ -42,6 +42,6 @@ int atecc608a_pubkey(uint8_t key_id, uint8_t *pubkey);
 int atecc608a_sign(uint8_t key_id, const uint8_t *msg, uint8_t *signature);
 
 // Verify a signature
-int atecc608a_verify(uint8_t key_id, const uint8_t *msg, const uint8_t *signature);
+int atecc608a_verify(const uint8_t *msg, const uint8_t *signature, const uint8_t *public_key);
 
 #endif

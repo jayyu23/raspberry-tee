@@ -365,7 +365,6 @@ int atecc608a_sign(uint8_t key_id, const uint8_t *msg, uint8_t *signature) {
     return 0;
 }
 
-// First, implement the missing verify_signature function
 int atecc608a_verify_signature(const uint8_t *signature, const uint8_t *public_key) {
     // Ensure the device is awake
     if (!atecc608a_is_awake()) {
@@ -403,14 +402,14 @@ int atecc608a_verify_signature(const uint8_t *signature, const uint8_t *public_k
     
     // Check verification result
     if (response[1] == 0x00) {
-        printk("Signature verified successfully\n");
+        // printk("Signature verified successfully\n");
         return 0; // Success
     } else if (response[1] == 0x01) {
-        printk("Signature verification failed - invalid signature\n");
+        // printk("Signature verification failed - invalid signature\n");
         return 1; // Invalid signature
     } else {
-        printk("Verification command returned error: 0x%02x\n", response[1]);
-        return -1; // Other error
+        printk("Verification command returned error: %x\n", response[1]);
+        return -1;
     }
 }
 int atecc608a_load_tempkey(const uint8_t *data) {
@@ -445,87 +444,17 @@ int atecc608a_load_tempkey(const uint8_t *data) {
 }
 
 int atecc608a_verify(const uint8_t *msg, const uint8_t *signature, const uint8_t *public_key) {
-    // Step 1: Load the message digest into TempKey
+    // Load the message digest into TempKey
     int ret = atecc608a_load_tempkey(msg);
     if (ret != 0) {
         printk("Failed to load message into TempKey\n");
         return -1;
     }
-    
-    // Step 2: Verify the signature against the public key
+    // Verify the signature against the public key
     ret = atecc608a_verify_signature(signature, public_key);
     
     // Put the device to sleep to save power
     atecc608a_sleep();
     
     return ret;
-}
-
-// Now create a complete test function
-int test_sign_verify(void) {
-    printk("Starting sign-verify test...\n");
-    
-    // Initialize the device
-    atecc608a_init();
-    
-    // Test message (this could be a hash of your actual data)
-    uint8_t message[32] = {
-        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-        0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
-        0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
-        0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20
-    };
-    
-    // Buffers for signature and public key
-    uint8_t signature[64] = {0};
-    uint8_t public_key[64] = {0};
-    
-    // Slot ID to use for signing - choose a slot configured with a private ECC key
-    uint8_t key_id = 0; // Adjust this to match your configuration
-    
-    // Step 1: Get the public key for the slot
-    printk("Retrieving public key from slot %d...\n", key_id);
-    if (atecc608a_pubkey(key_id, public_key) != 0) {
-        printk("Failed to retrieve public key\n");
-        return -1;
-    }
-    
-    // Print the public key (hex format for better readability)
-    printk("Public key: ");
-    for (int i = 0; i < 64; i++) {
-        printk("%x", public_key[i]);
-        if ((i + 1) % 16 == 0) printk("\n           ");
-    }
-    printk("\n");
-    
-    // Step 2: Sign the message with the private key
-    printk("Signing message with private key in slot %d...\n", key_id);
-    if (atecc608a_sign(key_id, message, signature) != 0) {
-        printk("Failed to sign message\n");
-        return -1;
-    }
-    
-    // Print the signature (hex format)
-    printk("Signature: ");
-    for (int i = 0; i < 64; i++) {
-        printk("%x", signature[i]);
-        if ((i + 1) % 16 == 0) printk("\n           ");
-    }
-    printk("\n");
-    
-    // Step 3: Verify the signature using the public key
-    printk("Verifying signature...\n");
-    message[3] = 0x09;
-    int result = atecc608a_verify(message, signature, public_key);
-    
-    if (result == 0) {
-        printk("VERIFICATION SUCCESSFUL: Signature is valid!\n");
-        return 0;
-    } else if (result == 1) {
-        printk("VERIFICATION FAILED: Signature is invalid\n");
-        return 1;
-    } else {
-        printk("VERIFICATION ERROR: Process failed\n");
-        return -1;
-    }
 }

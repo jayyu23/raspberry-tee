@@ -1,5 +1,5 @@
 
-objs/l1/l2/l3//tests/5-atecc-sign.elf:     file format elf32-littlearm
+objs/l1/l2/l3//tests/5-atecc-pk-sign.elf:     file format elf32-littlearm
 
 
 Disassembly of section .text:

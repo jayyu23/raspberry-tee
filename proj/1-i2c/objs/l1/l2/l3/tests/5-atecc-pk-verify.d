@@ -1,4 +1,4 @@
-objs/l1/l2/l3//tests/5-atecc-sign.o: tests/5-atecc-sign.c \
+objs/l1/l2/l3//tests/5-atecc-pk-verify.o: tests/5-atecc-pk-verify.c \
  /Users/jayyu/Documents/Jay/Work/Stanford/4-Senior/Winter/CS_140E/raspberry-tee//libpi/include/rpi.h \
  /Users/jayyu/Documents/Jay/Work/Stanford/4-Senior/Winter/CS_140E/raspberry-tee//libpi/libc/demand.h \
  /Users/jayyu/Documents/Jay/Work/Stanford/4-Senior/Winter/CS_140E/raspberry-tee//libpi/include/gpio.h \

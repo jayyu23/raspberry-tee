@@ -15,7 +15,9 @@ endif
 # PROGS += tests/4-test-arduino.c
 # PROGS += tests/4-arduino-keygen.c
 # PROGS += tests/4-arduino-signature.c
-PROGS += tests/5-atecc-sign.c
+# PROGS += tests/5-atecc-get-pubkey.c
+# PROGS += tests/5-atecc-pk-sign.c
+PROGS += tests/5-atecc-pk-verify.c
 
 # Common source files
 COMMON_SRC += ./i2c.c
