@@ -10,7 +10,6 @@ void i2c_init(void) {
     gpio_set_pullup(I2C_SCL);
     
     // Set up I2C with 100kHz clock
-    // Reset I2C
     PUT32(I2C_C, 0);
     dev_barrier();
     
@@ -24,9 +23,6 @@ void i2c_init(void) {
     
     // Enable I2C
     PUT32(I2C_C, I2C_C_I2CEN);
-    dev_barrier();
-
-    // Clock stretching
     dev_barrier();
     
     printk("I2C initialized\n");
@@ -51,7 +47,6 @@ int i2c_write(unsigned addr, uint8_t data[], unsigned nbytes) {
     PUT32(I2C_DLEN, nbytes);
     dev_barrier();
     
-    // Fill FIFO with data (be careful not to overflow)
     for (unsigned i = 0; i < nbytes && i < 16; i++) {  // 16 is FIFO size
         PUT32(I2C_FIFO, data[i]);
     }
@@ -80,7 +75,6 @@ int i2c_write(unsigned addr, uint8_t data[], unsigned nbytes) {
     
     // Wait for DONE flag
     while (!(GET32(I2C_S) & I2C_S_DONE)) {
-        // Just wait
     }
     
     // Check for success
@@ -161,8 +155,6 @@ int i2c_read(unsigned addr, uint8_t data[], unsigned nbytes) {
     return nbytes;
 }
 
-// Adding new functions required by the header
-
 void i2c_init_clk_div(unsigned clk_div) {
     // Reset I2C
     PUT32(I2C_C, 0);
@@ -192,17 +184,3 @@ void i2c_init_once(void) {
         i2c_initialized = 1;
     }
 }
-
-// Remove or uncomment in header if you want to keep this function
-#if 0
-int i2c_write_read(uint8_t addr, const uint8_t *wdata, unsigned wlen, uint8_t *rdata, unsigned rlen) {
-    if (i2c_write(addr, wdata, wlen) != wlen) {
-        return -1;
-    }
-    
-    // Small delay between write and read
-    delay_us(100);
-    
-    return i2c_read(addr, rdata, rlen);
-}
-#endif

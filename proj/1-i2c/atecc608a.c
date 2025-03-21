@@ -17,7 +17,7 @@ int atecc608a_is_awake(void) {
     // Check for execution status (device is awake but busy)
     if (read_result == 4 && response[0] == 0x04 && 
         (response[1] != 0xFF && response[1] != 0x01)) {
-        return 1;  // Device is awake but may be executing a command
+        return 1;
     }
     
     // If read fails or returns unexpected values, assume device is asleep
@@ -91,7 +91,7 @@ uint16_t calculate_crc16(size_t length, const uint8_t *data)
                 crc_register ^= polynom;
         }
     }
-    printk("CRC-16: %x\n", crc_register);
+    // printk("CRC-16: %x\n", crc_register);
     return crc_register;
 }
 
@@ -201,6 +201,8 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     return -1;  // Failure if max tries exceeded
 }
 
+// Get revision info - this can be called safely even if no config is set
+// Datasheet pg. 79 (Section 11.8)
 int atecc608a_get_revision_info(void) {
     printk("Executing get_revision_info...\n");
     
@@ -240,6 +242,7 @@ int atecc608a_init(void) {
     return 0;
 }
 
+// Get 32 random bytes
 int atecc608a_random(uint8_t *rand_out) {
     
     // Wake up the device
@@ -412,6 +415,8 @@ int atecc608a_verify_signature(const uint8_t *signature, const uint8_t *public_k
         return -1;
     }
 }
+
+// Load the message digest into TempKey slot
 int atecc608a_load_tempkey(const uint8_t *data) {
     // Wake up the device if needed
     if (!atecc608a_is_awake()) {
@@ -439,7 +444,7 @@ int atecc608a_load_tempkey(const uint8_t *data) {
         return -1;
     }
     
-    printk("Data successfully loaded into TempKey\n");
+    // printk("Data successfully loaded into TempKey\n");
     return 0;
 }
 
