@@ -5,7 +5,7 @@ Jay Yu and Rishi Padmanabhan
 
 CS 140E: Embedded Operating Systems, Winter 2025 Final Project
 
-![Raspberry TEE](./img/image.png)
+![Raspberry TEE](./img/raspberry-ledger.jpg)
 
 
 ## Key Features

@@ -28,7 +28,15 @@ void notmain(void) {
     }
     printk("\n");
     
-    uint8_t msg[] = "Hello, world!";
+    // uint8_t msg[] = "hi";
+    // message = "hi"
+    // SHA 256 hash of "hi"
+    uint8_t msg[] = {
+        0x8f, 0x43, 0x43, 0x46, 0x64, 0x8f, 0x6b, 0x96,
+        0xdf, 0x89, 0xdd, 0xa9, 0x01, 0xc5, 0x17, 0x6b,
+        0x10, 0xa6, 0xd8, 0x39, 0x61, 0xdd, 0x3c, 0x1a,
+        0xc8, 0x8b, 0x59, 0xb2, 0xdc, 0x32, 0x7a, 0xa4
+    };
 
     uint8_t signature[64];
     atecc608a_sign(0, msg, signature);
@@ -54,9 +62,9 @@ void notmain(void) {
     signature[0] ^= 1;
     result = atecc608a_verify(msg, signature, pubkey);
     if (result == 0) {
-        printk("Signature verified successfully!\n");
+        printk("Error: Corrupt signature verified successfully!\n");
     } else {
-        printk("Signature verification failed with result %d\n", result);
+        printk("Corrupt signature failed as expected with result %d\n", result);
     }
 
     clean_reboot();
