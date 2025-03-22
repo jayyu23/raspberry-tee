@@ -57,18 +57,4 @@ void i2c_init_once(void);
 
 int i2c_write_with_addr(uint8_t dev_addr, uint8_t word_addr, uint8_t data[], unsigned nbytes);
 
-
-
-// Initialize I2C
-// void i2c_init(void);
-
-// // Write data to I2C device
-// int i2c_write(uint8_t addr, const uint8_t *data, unsigned len);
-
-// // Read data from I2C device
-// int i2c_read(uint8_t addr, uint8_t *data, unsigned len);
-
-// // Write then read data (common I2C operation)
-// int i2c_write_read(uint8_t addr, const uint8_t *wdata, unsigned wlen, uint8_t *rdata, unsigned rlen);
-
 #endif

@@ -16,7 +16,7 @@ CS 140E: Embedded Operating Systems, Winter 2025 Final Project
 - Sign arbitrary messages with ECDSA-P256 private key
 - Verify signatures against the corresponding ECDSA-P256 public key
 - Test suite in `proj/1-i2c/tests`
-- Supplemental Arduino ATECC608A I2C slave simulator for testing I2C communication in `arduino-atecc608a`
+- Supplemental Arduino ATECC608A I2C slave simulator for testing I2C communication in `arduino-atecc608a` that uses `micro-ecc` library with `secp256k1` curve (aka Bitcoin curve)
 
 ## Setup
 

@@ -23,8 +23,6 @@ PROGS += tests/5-atecc-pk-verify.c
 COMMON_SRC += ./i2c.c
 COMMON_SRC += ./atecc608a.c
 
-# STAFF_OBJS += ./staff-i2c.o
-
 # Include directories
 
 # Optional bootloader
