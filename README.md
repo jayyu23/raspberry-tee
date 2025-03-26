@@ -29,7 +29,7 @@ Note that this project is intended as an academic prototype, and should not be u
 
 ## Setup
 
-1. Assumes working `pi-install` tool from [CS140E repo](https://github.com/dddrrreee/cs140e-25win).
+1. Assumes working `pi-install` bootloader tool from [CS140E repo](https://github.com/dddrrreee/cs140e-25win). Copy included in `proj/0-pi-setup/pi-install`. See baremetal implementation of CS 140E bootloader in `labs/6-bootloader`.
 2. Please set `CS140E_2025_PATH_FINAL` to the path of this project repository. 
 3. Make `libpi`, `cd libpi && make`
 4. `cd proj/1-i2c` and `make run`
