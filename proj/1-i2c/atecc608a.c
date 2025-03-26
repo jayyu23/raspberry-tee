@@ -26,8 +26,7 @@ int atecc608a_is_awake(void) {
 
 // Wake up the ATECC608A
 int atecc608a_wakeup(void) {
-    // Create a wake pulse by sending a "null" address (0x00)
-    // The datasheet recommends sending 0x00 at 100kHz to generate the wake pulse
+    // Create a wake pulse by holding SDA low for tWLO (min ~60us)
     gpio_set_function(I2C_SDA, GPIO_FUNC_OUTPUT);
 
     gpio_write(I2C_SDA, 0);
@@ -40,7 +39,7 @@ int atecc608a_wakeup(void) {
 
     // Wait for tWHI (at least 150 us) before communication
     delay_us(150);
-    printk("Wake pulse sent\n");
+    // printk("Wake pulse sent\n");
     i2c_init();
     // Now immediately perform I2C read from the ATECC608A
     uint8_t buffer[4];
@@ -115,7 +114,7 @@ static int atecc608a_send_command(uint8_t cmd, uint8_t p1, uint16_t p2,
     //        cmd, p1, p2, data_len);
     
     // Build packet
-    packet[0] = 0x03; // Word address
+    packet[0] = 0x03; // Word address is 0x03 for all commands
     packet[1] = count; // Packet length
     packet[2] = cmd; // Command
     packet[3] = p1; // Param1
